@@ -114,9 +114,43 @@ for (unsigned int i = 0; i < nstat; i++) {
     //then reset to last candidate
     curr = last;
   }
+  inchain = true;
+
+
+
+
+
+  //update S matrix
+  TMatrixDSym SNminusoneT(SNminusone);
+  SNminusoneT.T();
+  double etan = std::min(1.0, nparams*pow(double(i), -2.0/3.0));
+  TMatrixDSym WNWNT(nparams);
+  WNWNT.Zero();
+  for (unsigned int row = 0; row < WNWNT.GetNrows(); row++) {
+    for (unsigned int col = 0; col < WNWNT.GetNcols(); col++) {
+      WNWNT[row][col] = WN[row]*WN[col]/WN.Norm2Sqr();
+    }
+  }
+  TMatrixDSym SNSNT(identity + WNWNT*etan*(alpha-alphastar));
+  SNSNT = SNSNT.Similarity(SNminusone);
+
+  //SNSNT = (SNminusone*identity*SNminusoneT);
+  TDecompChol chol(SNSNT);
+  bool success = chol.Decompose();
+  assert(success);
+  TMatrixD SNT = chol.GetU();
+  TMatrixD SN(SNT);
+  SN.T();
+  for (unsigned int row = 0; row < SN.GetNrows; row++) {
+    for (unsigned int col = 0; col < SN.GetNcols; col++) {
+      SNminusone[row][col] = SN[row][col];
+    }
+  }
 }
 
-
+std::cout << ntested << " points were tested" << std::endl;
+std::cout << naccepted << " points were accepted" << std::endl;
+std::cout << "The accept fraction is " << double(naccepted)/double(ntested) << std::endl;
 
 
 

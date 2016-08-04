@@ -17,7 +17,7 @@ DIRNAME = ./
 #======================================================================
 # Nazwa rdzeniowa modulu programu
 #NAME1 = mark1
-NAME2 = llh_for_CERN
+NAME2 = llh_scan
 #NAME2 = generatory
 # Pliki objectowe (po kompilacji)
 #OBJT1 = $(NAME1).o

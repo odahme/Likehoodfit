@@ -6,11 +6,15 @@
 # Biblioteki ROOTa dla linkera
 # 1) Jawnie:
 ##  Sciezka to systemu ROOT - nalezy ja ustawic odpowiednio
-#RPATH = /usr/local/root/
-#RLIB=   -L$(RPATH)lib -lCore -lCint -lHist -lGraf -lGraf3d -lGpad -lTree  \
+RPATH = /home/oliver/ROOT/root/
+#RLIB=   -L$(RPATH)lib -lCore -lHist -lGraf -lGraf3d -lGpad -lRooFit -lRooFitCore -lTree  \
+
+RLIB=   -L$(RPATH)lib -lCore -lHist -lGraf -lGraf3d -lGpad -lTree -lMathCore -lRooFitCore -lRooFit \
+        -lRint -lPostscript -lMatrix -lPhysics -lm -ldl -lpthread -rdynamic -Wl,--no-as-needed $(ROOTGLIBS)
+
 #	-lRint -lPostscript -lMatrix -lPhysics -lm -ldl -lpthread -rdynamic
 # 2) Niejawnie, przy uzyciu root-config
-RLIB= `root-config --libs`
+#RLIB= `root-config --libs`
 #======================================================================
 # Nazwa biezacego katalogu
 DIRNAME = ./

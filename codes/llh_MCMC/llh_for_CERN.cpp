@@ -24,19 +24,21 @@ Likehood fit for CERN
 #include <unistd.h>
 using namespace std;
 
+#ifndef __CINT__
+#include "RooGlobalFunc.h"
+#endif
+#include "RooRealVar.h"
+#include "RooDataSet.h"
+#include "RooGaussian.h"
+#include "TCanvas.h"
+#include "RooPlot.h"
+#include "TAxis.h"
+using namespace RooFit ;
 
-// double f_gllh(double mu, double sigma, TVectorD gauss_points)
-// {
-//   double calc = gauss_points.GetNrows() * log(sqrt(2*TMath::Pi()*pow(sigma,2)));
-//   for (unsigned int i = 0; i < gauss_points.GetNrows(); i++) {
-//     calc += pow(gauss_points[i]-mu,2)/(2*pow(sigma,2));
-//   }
-//   return -calc;
-// }
 double f_gllh(double mu, double sigma, TVectorD gauss_points)
 {
   double calc = 0;
-  for (unsigned int i = 0; i < gauss_points.GetNrows(); i++) {
+  for (int i = 0; i < gauss_points.GetNrows(); i++) {
     calc += log(TMath::Gaus(gauss_points[i],mu,sigma,true));
   }
 
@@ -44,8 +46,71 @@ double f_gllh(double mu, double sigma, TVectorD gauss_points)
 }
 
 
+void rf101_basics() {
+  // S e t u p   m o d e l
+  // ---------------------
+
+  // Declare variables x,mean,sigma with associated name, title, initial value and allowed range
+  RooRealVar x("x","x",-10,10) ;
+  RooRealVar mean("mean","mean of gaussian",1,-10,10) ;
+  RooRealVar sigma("sigma","width of gaussian",1,0.1,10) ;
+
+  // Build gaussian p.d.f in terms of x,mean and sigma
+  RooGaussian gauss("gauss","gaussian PDF",x,mean,sigma) ;
+
+  // Construct plot frame in 'x'
+  RooPlot* xframe = x.frame(Title("Gaussian p.d.f.")) ;
+
+
+  // P l o t   m o d e l   a n d   c h a n g e   p a r a m e t e r   v a l u e s
+  // ---------------------------------------------------------------------------
+
+  // Plot gauss in frame (i.e. in x)
+  gauss.plotOn(xframe) ;
+
+  // Change the value of sigma to 3
+  sigma.setVal(3) ;
+
+  // Plot gauss in frame (i.e. in x) and draw frame on canvas
+  gauss.plotOn(xframe,LineColor(kRed)) ;
+
+
+  // G e n e r a t e   e v e n t s
+  // -----------------------------
+
+  // Generate a dataset of 1000 events in x from gauss
+  RooDataSet* data = gauss.generate(x,10000) ;
+
+  // Make a second plot frame in x and draw both the
+  // data and the p.d.f in the frame
+  RooPlot* xframe2 = x.frame(Title("Gaussian p.d.f. with data")) ;
+  data->plotOn(xframe2) ;
+  gauss.plotOn(xframe2) ;
+
+
+  // F i t   m o d e l   t o   d a t a
+  // -----------------------------
+
+  // Fit pdf to data
+  gauss.fitTo(*data) ;
+
+  // Print values of mean and sigma (that now reflect fitted values and errors)
+  mean.Print() ;
+  sigma.Print() ;
+
+  // Draw all frames on a canvas
+  TCanvas* c = new TCanvas("rf101_basics","rf101_basics",800,400) ;
+  c->Divide(2) ;
+  c->cd(1) ; gPad->SetLeftMargin(0.15) ; xframe->GetYaxis()->SetTitleOffset(1.6) ; xframe->Draw() ;
+  c->cd(2) ; gPad->SetLeftMargin(0.15) ; xframe2->GetYaxis()->SetTitleOffset(1.6) ; xframe2->Draw() ;
+
+
+}
+
+
+
 int main(int argc, char **argv) {
-unsigned long jobID = 0;
+
 TRandom3 *rnd = new TRandom3(35);
 
 //create a window
@@ -53,7 +118,7 @@ TApplication theApp("demoApplication",&argc,argv);
 //create a canvas
 
 TCanvas c1("c1","c1",1,1,1920,1080);
-//TCanvas c2("c2","c2",1,1,1024,768);
+TCanvas c2("c2","c2",1,1,1920,1080);
 //TCanvas c3("c3","c3",1,1,1024,768);
 
 TH1F * hist = new TH1F("hist", "hist", 100, -2, 8);
@@ -65,7 +130,7 @@ unsigned long gp = 1000; //number of points
 TVectorD gauss_points(gp);
 double real_sigma = 1.5;
 double real_mu = 3;
-for (unsigned int j = 0; j < gauss_points.GetNrows(); j++) {
+for (int j = 0; j < gauss_points.GetNrows(); j++) {
   gauss_points[j] = rnd->Gaus(real_mu,real_sigma);
   hist->Fill(gauss_points[j]);
 }
@@ -81,11 +146,16 @@ double ubsigma = 3; //upper bound for sigma
 double lbsigma = 0.5; //lower bound for sigma
 double alphastar = 0.234; //forced acceptance rate
 
+
+
+
+
+
+
 ofstream rejectstream;
 ofstream acceptstream;
 
 Bool_t accepted;
-Bool_t inchain;
 unsigned int ntested = 0;
 unsigned int naccepted = 0;
 
@@ -96,6 +166,7 @@ unsigned int nplotp = 50; //number of points in plot
 double llh_p[nstat];
 double mu_p[nstat];
 double minllh = 1e32;
+double bestmu = 42;
 
 unsigned int nlast = 200;
 std::vector<bool> lastaccepted;
@@ -127,7 +198,7 @@ for (unsigned int i = 0; i < nstat; i++) {
   curr = last; //use value of last for current then vary
 
   TVectorD WN(nparams);
-  for (unsigned int j = 0; j < WN.GetNrows() ; j++) {
+  for (int j = 0; j < WN.GetNrows() ; j++) {
     WN[j] = rnd->Gaus(0.0, maxstep);
   }
   TVectorD SW(SNminusone*WN);
@@ -157,6 +228,7 @@ for (unsigned int i = 0; i < nstat; i++) {
 
 if (llh_curr < minllh) {
   minllh = llh_curr;
+  bestmu = curr[0];
 }
 
   llh_p[i] = llh_curr;
@@ -198,7 +270,7 @@ if (i % (nstat/nplotp) == 0) {
     TGraph * gr = new TGraph(nplotp,muplotp,llhplotp);
     c1.cd();
     gr->Draw("A*");
-    c1.Update();
+    //c1.Update();
     //usleep(500);
   }
 
@@ -219,9 +291,8 @@ if (i % (nstat/nplotp) == 0) {
   } else {
     //std::cout << "candidate found" << std::endl;
     accepted = false;
-    inchain = false;
     //first save rejected candidate to file
-    for (unsigned int line = 0; line < curr.GetNrows(); line++) {
+    for (int line = 0; line < curr.GetNrows(); line++) {
       rejectstream << curr[line] << "\n";
       //std::cout << curr[line] << std::endl;
     }
@@ -229,9 +300,7 @@ if (i % (nstat/nplotp) == 0) {
     curr = last;
   }
 
-  inchain = true;
-
-  for (unsigned int line = 0; line < curr.GetNrows(); line++) {
+  for (int line = 0; line < curr.GetNrows(); line++) {
     acceptstream << curr[line] << "\n";
     //std::cout << curr[line] << std::endl;
   }
@@ -266,8 +335,8 @@ if (i % (nstat/nplotp) == 0) {
   double etan = std::min(1.0, nparams*pow(double(i), -2.0/3.0));
   TMatrixDSym WNWNT(nparams);
   WNWNT.Zero();
-  for (unsigned int row = 0; row < WNWNT.GetNrows(); row++) {
-    for (unsigned int col = 0; col < WNWNT.GetNcols(); col++) {
+  for (int row = 0; row < WNWNT.GetNrows(); row++) {
+    for (int col = 0; col < WNWNT.GetNcols(); col++) {
       WNWNT[row][col] = WN[row]*WN[col]/WN.Norm2Sqr();
     }
   }
@@ -281,8 +350,8 @@ if (i % (nstat/nplotp) == 0) {
   TMatrixD SNT = chol.GetU();
   TMatrixD SN(SNT);
   SN.T();
-  for (unsigned int row = 0; row < SN.GetNrows(); row++) {
-    for (unsigned int col = 0; col < SN.GetNcols(); col++) {
+  for (int row = 0; row < SN.GetNrows(); row++) {
+    for (int col = 0; col < SN.GetNcols(); col++) {
       SNminusone[row][col] = SN[row][col];
     }
   }
@@ -294,21 +363,42 @@ std::cout << ntested << " points were tested" << std::endl;
 std::cout << naccepted << " points were accepted" << std::endl;
 std::cout << "The accept fraction is " << double(naccepted)/double(ntested) << std::endl;
 
+//checking error at 68% confidence
+for (unsigned int i = 0; i < nstat; i++) {
+  llh_p[i] -= minllh;
+}
+double halfmin = 0.5;
+double halfmax = 0.5;
+Bool_t not2mu = true;
+while (not2mu) {
+  unsigned int imu = 0;
+  for (unsigned int i = 0; i < nstat; i++) {
+    if (llh_p[i] < halfmax && llh_p[i] > halfmin) {
+      imu++;
+    }
+  }
+  if (imu == 2) {
+    not2mu = false;
+  } else {
+    halfmin -= 0.001;
+    halfmax += 0.001;
+  }
+  std::cout << "imu = "<< imu << std::endl;
+  std::cout << "halfmax ="<< halfmax << std::endl;
+}
+
 double mue[2];
 unsigned int imu = 0;
 for (unsigned int i = 0; i < nstat; i++) {
-  llh_p[i] -= minllh;
-  if (llh_p[i] < 0.51 && llh_p[i] > 0.49) {
-    std::cout << "mu = "<< mu_p[i] << std::endl;
-    mue[imu] = mu_p[i];
+  if (llh_p[i] < halfmax && llh_p[i] > halfmin) {
+    mue[imu] = llh_p[i];
     imu++;
   }
 }
 
-std::cout << "error at 68p = " << abs(mue[0] - mue[1]) << std::endl;
 
 
-TGraph * gr = new TGraph(nstat,mu_p,llh_p);
+//TGraph * gr = new TGraph(nstat,mu_p,llh_p);
 c1.cd();
 //gr->Draw("A*");
 c1.SaveAs("lastllh.png");
@@ -316,6 +406,39 @@ c1.SaveAs("lastllh.png");
 //hist->Fit("gaus");
 //hist->Draw();
 //c2.SaveAs("gauss_points.png");
+
+//root fit stuff start
+RooRealVar x("x","x",-10,10) ;
+RooRealVar mean("mean","mean of gaussian",first_mu,lbmu,ubmu) ;
+RooRealVar sigma("sigma","width of gaussian",first_simga,lbsigma,ubsigma) ;
+
+// Build gaussian p.d.f in terms of x,mean and sigma
+
+
+RooPlot* xframe = x.frame(Title("Gaussian p.d.f. with points")) ;
+
+
+
+RooDataSet data("data", "data",RooArgSet(x));
+
+ for (unsigned int i = 0; i < gp; i++) {
+   x = gauss_points[i];
+   data.add(RooArgSet(x));
+}
+data.Print("v");
+cout << endl ;
+
+RooGaussian gauss("gauss","gaussian PDF",x,mean,sigma) ;
+
+gauss.fitTo(data);
+mean.Print() ;
+std::cout <<"mu(MCMC) = "<< bestmu << "+-" << abs(mue[0] - mue[1]) << std::endl;
+//root fit stuff end
+
+gauss.plotOn(xframe) ;
+
+c2.cd();
+xframe->Draw();
 
 //turns off the program with mous clic
 theApp.Connect("TCanvas","Closed()","TApplication",&theApp,"Terminate()");

@@ -33,7 +33,7 @@ SN.Zero();
 double minllh = getllh(last);
 //last.negllh = minllh;
 
-double alphastar = 0.234; //forced acceptance rate
+double alphastar = 0.1; //forced acceptance rate
 
 for (unsigned int i=0; i<nstat; i++)
     {

@@ -163,8 +163,8 @@ TVectorD last(nparams);
 TVectorD curr(nparams);
 
 unsigned int nplotp = 50; //number of points in plot
-double llh_p[nstat];
-double mu_p[nstat];
+TVectorD llh_p(nstat);
+TVectorD mu_p(nstat);
 double minllh = 1e32;
 double bestmu = 42;
 
@@ -364,37 +364,68 @@ std::cout << naccepted << " points were accepted" << std::endl;
 std::cout << "The accept fraction is " << double(naccepted)/double(ntested) << std::endl;
 
 //checking error at 68% confidence
-for (unsigned int i = 0; i < nstat; i++) {
-  llh_p[i] -= minllh;
-}
-double halfmin = 0.5;
-double halfmax = 0.5;
-Bool_t not2mu = true;
-while (not2mu) {
-  unsigned int imu = 0;
-  for (unsigned int i = 0; i < nstat; i++) {
-    if (llh_p[i] < halfmax && llh_p[i] > halfmin) {
-      imu++;
+
+unsigned int npininterval = 0;
+unsigned int trials = 0;
+TVectorD mup_for_error(int(nstat*0.68));
+while (double(npininterval)/double(nstat) < 0.68) {
+  TVectorD imup_for_error(int(nstat*0.68));
+  unsigned int npinintervalcurr = 0;
+  double interval = double(trials)/(nstat*100.0);
+  for (unsigned int j = 0; j < nstat; j++) {
+    if (mu_p[j] < bestmu+interval && mu_p[j] > bestmu-interval) {
+      imup_for_error[npinintervalcurr] = mu_p[j];
+      npinintervalcurr++;
     }
   }
-  if (imu == 2) {
-    not2mu = false;
-  } else {
-    halfmin -= 0.001;
-    halfmax += 0.001;
+  trials++;
+  npininterval = npinintervalcurr;
+  mup_for_error = imup_for_error;
+}
+ double mue[2];
+ mue[0] = -1e32;
+ mue[1] = +1e32;
+for (unsigned int i = 0; i < nstat*0.68; i++) {
+  if (mup_for_error[i] > mue[0]) {
+    mue[0] = mup_for_error[i];
   }
-  std::cout << "imu = "<< imu << std::endl;
-  std::cout << "halfmax ="<< halfmax << std::endl;
+  if (mup_for_error[i] < mue[1]) {
+    mue[1] = mup_for_error[i];
+  }
 }
 
-double mue[2];
-unsigned int imu = 0;
-for (unsigned int i = 0; i < nstat; i++) {
-  if (llh_p[i] < halfmax && llh_p[i] > halfmin) {
-    mue[imu] = llh_p[i];
-    imu++;
-  }
-}
+
+// for (unsigned int i = 0; i < nstat; i++) {
+//   llh_p[i] -= minllh;
+// }
+// double halfmin = 0.5;
+// double halfmax = 0.5;
+// Bool_t not2mu = true;
+// while (not2mu) {
+//   unsigned int imu = 0;
+//   for (unsigned int i = 0; i < nstat; i++) {
+//     if (llh_p[i] < halfmax && llh_p[i] > halfmin) {
+//       imu++;
+//     }
+//   }
+//   if (imu == 2) {
+//     not2mu = false;
+//   } else {
+//     halfmin -= 0.001;
+//     halfmax += 0.001;
+//   }
+//   std::cout << "imu = "<< imu << std::endl;
+//   std::cout << "halfmax ="<< halfmax << std::endl;
+// }
+//
+
+// unsigned int imu = 0;
+// for (unsigned int i = 0; i < nstat; i++) {
+//   if (llh_p[i] < halfmax && llh_p[i] > halfmin) {
+//     mue[imu] = llh_p[i];
+//     imu++;
+//   }
+// }
 
 
 
@@ -432,10 +463,12 @@ RooGaussian gauss("gauss","gaussian PDF",x,mean,sigma) ;
 
 gauss.fitTo(data);
 mean.Print() ;
-std::cout <<"mu(MCMC) = "<< bestmu << "+-" << abs(mue[0] - mue[1]) << std::endl;
+std::cout <<"mu(MCMC) = "<< bestmu << "+-" << (mue[0] - mue[1]) << std::endl;
 //root fit stuff end
 
+data.plotOn(xframe) ;
 gauss.plotOn(xframe) ;
+
 
 c2.cd();
 xframe->Draw();

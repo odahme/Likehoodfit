@@ -30,9 +30,14 @@ using namespace std;
 #include "RooRealVar.h"
 #include "RooDataSet.h"
 #include "RooGaussian.h"
-#include "TCanvas.h"
 #include "RooPlot.h"
 #include "TAxis.h"
+#include "RooConstVar.h"
+#include "RooProdPdf.h"
+#include "RooAddPdf.h"
+#include "RooMinuit.h"
+#include "RooFitResult.h"
+#include "TH1.h"
 using namespace RooFit ;
 
 double f_gllh(double mu, double sigma, TVectorD gauss_points)
@@ -140,8 +145,8 @@ for (int j = 0; j < gauss_points.GetNrows(); j++) {
 unsigned int nparams = 2; //number of parameters
 unsigned int nstat = 1000;//number of tries
 double maxstep = 0.01; //maximum step size
-double ubmu = 5; //upper bound for mu
-double lbmu = 1; //lower bound for mu
+double ubmu = 4; //upper bound for mu
+double lbmu = 1.5; //lower bound for mu
 double ubsigma = 3; //upper bound for sigma
 double lbsigma = 0.5; //lower bound for sigma
 double alphastar = 0.234; //forced acceptance rate
@@ -254,25 +259,25 @@ if (i % (nstat/nplotp) == 0) {
   c1.Update();
   inplotp++;
   usleep(1000000);
-}*/
-
+}
+*/
 //evolution of the llh
-
-  if (i > nplotp) {
-    double llhplotp[nplotp];
-    double muplotp[nplotp];
-    for (unsigned int inplotp = 0; inplotp < nplotp; inplotp++) {
-      llhplotp[inplotp] = llh_p[i-inplotp];
-      muplotp[inplotp] = mu_p[i-inplotp];
-    }
-
-
-    TGraph * gr = new TGraph(nplotp,muplotp,llhplotp);
-    c1.cd();
-    gr->Draw("A*");
-    //c1.Update();
-    //usleep(500);
-  }
+  //
+  // if (i > nplotp) {
+  //   double llhplotp[nplotp];
+  //   double muplotp[nplotp];
+  //   for (unsigned int inplotp = 0; inplotp < nplotp; inplotp++) {
+  //     llhplotp[inplotp] = llh_p[i-inplotp];
+  //     muplotp[inplotp] = mu_p[i-inplotp];
+  //   }
+  //
+  //
+  //   TGraph * gr = new TGraph(nplotp,muplotp,llhplotp);
+  //   c2.cd();
+  //   gr->Draw("A*");
+  //   c2.Update();
+  //   usleep(100000);
+  // }
 
 
 
@@ -320,12 +325,12 @@ if (i % (nstat/nplotp) == 0) {
   lastaccepted.pop_back();
   }
 
-  if (accepted){
-    std::cout << "set " << i << " accepted, rate " << std::fixed << std::setprecision(3) << acceptrate << " last " << nlast << " " << lastratio << std::endl;
-  }
-  else{
-    std::cout << "set " << i << " rejected, rate " << std::fixed << std::setprecision(3) << acceptrate << " last " << nlast << " " << lastratio << std::endl;
-  }
+  // if (accepted){
+  //   std::cout << "set " << i << " accepted, rate " << std::fixed << std::setprecision(3) << acceptrate << " last " << nlast << " " << lastratio << std::endl;
+  // }
+  // else{
+  //   std::cout << "set " << i << " rejected, rate " << std::fixed << std::setprecision(3) << acceptrate << " last " << nlast << " " << lastratio << std::endl;
+  // }
 
   ntested++;
 
@@ -429,9 +434,9 @@ for (unsigned int i = 0; i < nstat*0.68; i++) {
 
 
 
-//TGraph * gr = new TGraph(nstat,mu_p,llh_p);
+TGraph *gr = new TGraph(mu_p,llh_p);
 c1.cd();
-//gr->Draw("A*");
+gr->Draw("A*");
 c1.SaveAs("lastllh.png");
 //c2.cd();
 //hist->Fit("gaus");
@@ -440,38 +445,82 @@ c1.SaveAs("lastllh.png");
 
 //root fit stuff start
 RooRealVar x("x","x",-10,10) ;
+//
 RooRealVar mean("mean","mean of gaussian",first_mu,lbmu,ubmu) ;
 RooRealVar sigma("sigma","width of gaussian",first_simga,lbsigma,ubsigma) ;
-
-// Build gaussian p.d.f in terms of x,mean and sigma
-
-
-RooPlot* xframe = x.frame(Title("Gaussian p.d.f. with points")) ;
-
-
-
+RooGaussian gauss("gauss","gaussian PDF",x,mean,sigma) ;
 RooDataSet data("data", "data",RooArgSet(x));
 
  for (unsigned int i = 0; i < gp; i++) {
    x = gauss_points[i];
    data.add(RooArgSet(x));
 }
-data.Print("v");
-cout << endl ;
 
-RooGaussian gauss("gauss","gaussian PDF",x,mean,sigma) ;
+// Construct unbinned likelihood of model w.r.t. data
+  RooAbsReal* nll = gauss.createNLL(data) ;
 
-gauss.fitTo(data);
-mean.Print() ;
-std::cout <<"mu(MCMC) = "<< bestmu << "+-" << (mue[0] - mue[1]) << std::endl;
+// Create MINUIT interface object
+  RooMinuit m(*nll) ;
+
+// Activate verbose logging of MINUIT parameter space stepping
+  m.setVerbose(kTRUE) ;
+
+//MIGRAD minimalisation
+
+
+// Call MIGRAD to minimize the likelihood
+  m.migrad() ;
+
+// Print values of all parameters, that reflect values (and error estimates)
+  // that are back propagated from MINUIT
+  gauss.getParameters(x)->Print("s") ;
+
+// Disable verbose logging
+  m.setVerbose(kFALSE) ;
+
+// Run HESSE to calculate errors from d2L/dp2
+  m.hesse() ;
+
+// Run MINOS on sigma_g2 parameter only
+  m.minos(sigma) ;
+
+
+RooPlot* xframe = mean.frame(Title("RooPlot")) ;
+//data.Print("v");
+//cout << endl ;
+//gauss.fitTo(data);
+//mean.Print() ;
+//std::cout <<"mu(MCMC) = "<< bestmu << "+-" << (mue[0] - mue[1]) << std::endl;
+
+//data->plotOn(xframe) ;
+//model.plotOn(xframe) ;
+nll->plotOn(xframe);
+xframe->SetAxisRange(-10,10);
+
 //root fit stuff end
-
-data.plotOn(xframe) ;
-gauss.plotOn(xframe) ;
-
-
 c2.cd();
 xframe->Draw();
+
+TVectorD testrange(5400);
+TVectorD testval(5400);
+
+int n = 0;
+for (int i = 800; i < 5200; i++) {
+  testrange[n] = i/1000.0;
+  mean.setVal(i/1000.0);
+  sigma.setVal(real_sigma);
+  RooArgSet testset(mean,sigma);
+  testval[n] = nll->getVal(testset);
+  std::cout << testval[n] << std::endl;
+  n++;
+}
+
+TGraph *testg = new TGraph(testrange,testval);
+c1.cd();
+testg->Draw("A*");
+
+
+
 
 //turns off the program with mous clic
 theApp.Connect("TCanvas","Closed()","TApplication",&theApp,"Terminate()");

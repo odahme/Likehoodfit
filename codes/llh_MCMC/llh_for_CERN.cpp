@@ -35,20 +35,20 @@ using namespace std;
 #include "RooConstVar.h"
 #include "RooProdPdf.h"
 #include "RooAddPdf.h"
-#include "RooMinuit.h"
+#include "RooMinuitMCMC.h"
 #include "RooFitResult.h"
 #include "TH1.h"
 using namespace RooFit ;
 
 double f_gllh(double mu, double sigma, TVectorD gauss_points)
-{
-  double calc = 0;
-  for (int i = 0; i < gauss_points.GetNrows(); i++) {
-    calc += log(TMath::Gaus(gauss_points[i],mu,sigma,true));
-  }
+  {
+    double calc = 0;
+    for (int i = 0; i < gauss_points.GetNrows(); i++) {
+      calc += log(TMath::Gaus(gauss_points[i],mu,sigma,true));
+    }
 
-  return -calc;
-}
+    return -calc;
+  }
 
 
 void rf101_basics() {
@@ -460,30 +460,9 @@ RooDataSet data("data", "data",RooArgSet(x));
   RooAbsReal* nll = gauss.createNLL(data) ;
 
 // Create MINUIT interface object
-  RooMinuit m(*nll) ;
+  RooMinuitMCMC m(*nll) ;
 
-// Activate verbose logging of MINUIT parameter space stepping
-  m.setVerbose(kTRUE) ;
-
-//MIGRAD minimalisation
-
-
-// Call MIGRAD to minimize the likelihood
-  m.migrad() ;
-
-// Print values of all parameters, that reflect values (and error estimates)
-  // that are back propagated from MINUIT
-  gauss.getParameters(x)->Print("s") ;
-
-// Disable verbose logging
-  m.setVerbose(kFALSE) ;
-
-// Run HESSE to calculate errors from d2L/dp2
-  m.hesse() ;
-
-// Run MINOS on sigma_g2 parameter only
-  m.minos(sigma) ;
-
+m.mcmc();
 
 RooPlot* xframe = mean.frame(Title("RooPlot")) ;
 //data.Print("v");
@@ -511,14 +490,13 @@ for (int i = 800; i < 5200; i++) {
   sigma.setVal(real_sigma);
   RooArgSet testset(mean,sigma);
   testval[n] = nll->getVal(testset);
-  std::cout << testval[n] << std::endl;
+//  std::cout << testval[n] << std::endl;
   n++;
 }
 
 TGraph *testg = new TGraph(testrange,testval);
 c1.cd();
 testg->Draw("A*");
-
 
 
 

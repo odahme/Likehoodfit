@@ -10,7 +10,7 @@ RPATH = /home/oliver/ROOT/root/
 #RLIB=   -L$(RPATH)lib -lCore -lHist -lGraf -lGraf3d -lGpad -lRooFit -lRooFitCore -lTree  \
 
 RLIB=   -L$(RPATH)lib -lCore -lHist -lGraf -lGraf3d -lGpad -lTree -lMathCore -lRooFitCore -lRooFit \
-        -lRint -lPostscript -lMatrix -lPhysics -lm -ldl -lpthread -rdynamic -Wl,--no-as-needed $(ROOTGLIBS)
+        -lRint -lPostscript -lMatrix -lPhysics -lMinuit -lm -ldl -lpthread -rdynamic -Wl,--no-as-needed $(ROOTGLIBS)
 
 #	-lRint -lPostscript -lMatrix -lPhysics -lm -ldl -lpthread -rdynamic
 # 2) Niejawnie, przy uzyciu root-config
@@ -20,17 +20,17 @@ RLIB=   -L$(RPATH)lib -lCore -lHist -lGraf -lGraf3d -lGpad -lTree -lMathCore -lR
 DIRNAME = ./
 #======================================================================
 # Nazwa rdzeniowa modulu programu
-#NAME1 = mark1
+NAME1 = RooMinuitMCMC
 NAME2 = llh_for_CERN
 #NAME2 = generatory
 # Pliki objectowe (po kompilacji)
-#OBJT1 = $(NAME1).o
+OBJT1 = $(NAME1).o
 OBJT2 = $(NAME2).o
 # Pliki wykonawcze (po linkowaniu)
 #EXEC1 = $(NAME1).x
 EXEC1 = $(NAME2).x
 # Nazwa i opcje kompilatora
-CXX = g++ -fopenmp
+CXX = g++
 # 1) Jawnie
 #CXXFLAGS = -O -Wall -pthread -I$(RPATH)include
 # 2) Przy uzyciu root-config

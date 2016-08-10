@@ -20,7 +20,7 @@
 //#include "TStopwatch.h"
 //#include <fstream>
 //#include "TMatrixDSymfwd.h"
-//#include <vector>
+#include <vector>
 //#include <string>
 //#include <map>
 
@@ -29,7 +29,7 @@ class RooAbsReal ;
 class RooArgList ;
 //class RooRealVar ;
 //class RooArgSet ;
-//class RooAbsArg ;
+class RooAbsArg ;
 //class TVirtualFitter ;
 //class TH2F ;
 //class RooPlot ;
@@ -54,6 +54,7 @@ public:
 //  RooFitResult* fit(const char* options) ;
 
   Int_t mcmc();
+  Int_t mcmc_func_val();
   // Int_t migrad() ;
   // Int_t hesse() ;
 //  Int_t minos() ;
@@ -107,7 +108,7 @@ public:
 //
 //   void saveStatus(const char* label, Int_t status) { _statusHistory.push_back(std::pair<std::string,int>(label,status)) ; }
 //
-//   void updateFloatVec() ;
+   void updateFloatVec() ;
 //
  private:
 //
@@ -119,15 +120,15 @@ public:
 //   Bool_t      _profile ;
 //   Bool_t      _handleLocalErrors ;
 //   Int_t       _numBadNLL ;
-//   Int_t       _nPar ;
+   Int_t       _nPar ;
 //   Int_t       _printEvalErrors ;
 //   Bool_t      _doEvalErrorWall ;
 //   Int_t       _maxEvalMult ;
    RooArgList* _floatParamList ;
-//   std::vector<RooAbsArg*> _floatParamVec ;
+   std::vector<RooAbsArg*> _floatParamVec ;
    RooArgList* _initFloatParamList ;
-  //  RooArgList* _constParamList ;
-//   RooArgList* _initConstParamList ;
+   RooArgList* _constParamList ;
+   RooArgList* _initConstParamList ;
    RooAbsReal* _func ;
 //
 //   Double_t    _maxFCN ;

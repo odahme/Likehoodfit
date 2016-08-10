@@ -39,7 +39,7 @@
 // END_HTML
 //
 
-// #include "RooFit.h"
+ #include "RooFit.h"
 // #include "Riostream.h"
 //
 // #include "TClass.h"
@@ -70,6 +70,8 @@
 //new stuff
 #include <TVectorD.h>
 #include <TRandom3.h>
+#include "RooDataSet.h"
+#include "TDecompChol.h"
 
 
 
@@ -142,30 +144,30 @@ RooMinuitMCMC::RooMinuitMCMC(RooAbsReal& function)
   }
   _floatParamList->setName("floatParamList") ;
 
-  // _constParamList = (RooArgList*) paramList.selectByAttrib("Constant",kTRUE) ;
-  // if (_constParamList->getSize()>1) {
-  //   _constParamList->sort() ;
-  // }
-  // _constParamList->setName("constParamList") ;
-//
-//   // Remove all non-RooRealVar parameters from list (MINUIT cannot handle them)
-//   TIterator* pIter = _floatParamList->createIterator() ;
-//   RooAbsArg* arg ;
-//   while((arg=(RooAbsArg*)pIter->Next())) {
-//     if (!arg->IsA()->InheritsFrom(RooAbsRealLValue::Class())) {
-//       coutW(Minimization) << "RooMinuitMCMC::RooMinuitMCMC: removing parameter " << arg->GetName()
-// 			  << " from list because it is not of type RooRealVar" << endl ;
-//       _floatParamList->remove(*arg) ;
-//     }
-//   }
-//   _nPar      = _floatParamList->getSize() ;
-//   delete pIter ;
-//
-//   updateFloatVec() ;
-//
+  _constParamList = (RooArgList*) paramList.selectByAttrib("Constant",kTRUE) ;
+  if (_constParamList->getSize()>1) {
+    _constParamList->sort() ;
+  }
+  _constParamList->setName("constParamList") ;
+
+  // Remove all non-RooRealVar parameters from list (MINUIT cannot handle them)
+  TIterator* pIter = _floatParamList->createIterator() ;
+  RooAbsArg* arg ;
+  while((arg=(RooAbsArg*)pIter->Next())) {
+    if (!arg->IsA()->InheritsFrom(RooAbsRealLValue::Class())) {
+      // coutW(Minimization) << "RooMinuitMCMC::RooMinuitMCMC: removing parameter " << arg->GetName()
+			//   << " from list because it is not of type RooRealVar" << endl ;
+      _floatParamList->remove(*arg) ;
+    }
+  }
+  _nPar      = _floatParamList->getSize() ;
+  delete pIter ;
+
+  updateFloatVec() ;
+
 //   // Save snapshot of initial lists
    _initFloatParamList = (RooArgList*) _floatParamList->snapshot(kFALSE) ;
-//   _initConstParamList = (RooArgList*) _constParamList->snapshot(kFALSE) ;
+   _initConstParamList = (RooArgList*) _constParamList->snapshot(kFALSE) ;
 //
 //   // Initialize MINUIT
 //   Int_t nPar= _floatParamList->getSize() + _constParamList->getSize() ;
@@ -219,28 +221,25 @@ RooMinuitMCMC::~RooMinuitMCMC()
 
 Int_t RooMinuitMCMC::mcmc()
 {
+  _func->Print();
   TRandom3 *rnd = new TRandom3(35); //random generator with seed
-  unsigned int nparams = _floatParamList->getSize(); //number of parameters
-  unsigned int nstat = 1000;//number of tries
+  unsigned int nparams = _nPar; //number of parameters
+  unsigned int nstat = 5;//number of tries
   double maxstep = 0.01; //maximum step size
   double alphastar = 0.234; //forced acceptance rate
-
-for (size_t i = 0; i < _floatParamList->getSize()-1; i++) {
-  std::cout << _func_floatParamList[i] << std::endl;
-}
 
 
   Bool_t accepted;
   unsigned int ntested = 0;
   unsigned int naccepted = 0;
 
-  TVectorD last(nparams);
-  TVectorD curr(nparams);
+  RooArgList* last = (RooArgList*) _floatParamList->snapshot(kTRUE);
+  RooArgList* curr = (RooArgList*) _floatParamList->snapshot(kTRUE);
 
-  TVectorD llh_p(nstat);
-  TVectorD mu_p(nstat);
+
+  // TVectorD llh_p(nstat);
+  // TVectorD mu_p(nstat);
   double minllh = 1e32;
-  double bestmu;
 
   unsigned int nlast = 200;
   std::vector<bool> lastaccepted;
@@ -257,13 +256,133 @@ for (size_t i = 0; i < _floatParamList->getSize()-1; i++) {
   TMatrixDSym SN(nparams);
   SN.Zero();
 
+  for (unsigned int i = 0; i < nstat; i++) {
+     curr = (RooArgList*) last->snapshot(kTRUE);//use value of last for current then vary
 
 
+    TVectorD WN(nparams);
+    for (int j = 0; j < WN.GetNrows() ; j++) {
+      WN[j] = rnd->Gaus(0.0, maxstep);
+    }
+    TVectorD SW(SNminusone*WN);
+
+    for (int i = 0; i < curr->getSize(); i++) {
+      RooRealVar* var = (RooRealVar*) curr->at(i);
+      double calc = var->getVal() + SW[i] ;
+      var->setVal(calc);
+    }
+
+
+
+    //get llh for current and last
+    double llh_last = _func->getVal(*last);
+    double llh_curr = _func->getVal(*curr);
+    std::cout << "lastllh = "<< llh_last << std::endl;
+    std::cout << "currllh = "<< llh_curr << std::endl;
+
+    if (llh_curr < minllh) {
+      minllh = llh_curr;
+    }
+
+    double alpha = std::min(1.0, exp(llh_last - llh_curr));
+    double r = rnd->Uniform(0,1);
+    accepted = false;
+    double acceptrate = double(naccepted)/double(ntested);
+
+    if (r < alpha) {
+      //success
+      accepted = true;
+      naccepted++;
+      last = (RooArgList*) curr->snapshot(kFALSE);
+    } else {
+      //reset to last candidate
+      accepted = false;
+      curr = (RooArgList*) last->snapshot(kFALSE);
+    }
+
+    lastaccepted.insert(lastaccepted.begin(), accepted);
+    double lastratio = 0.0;
+    if (lastaccepted.size() > nlast)
+    {
+    //lastaccepted.push_back(accepted);
+    unsigned int nlastaccepted = 0;
+    for (unsigned int j=0; j<lastaccepted.size(); j++)
+    if (lastaccepted.at(j))
+      nlastaccepted++;
+    lastratio = double(nlastaccepted)/double(lastaccepted.size());
+    lastaccepted.pop_back();
+    }
+
+    // if (accepted){
+    //   std::cout << "set " << i << " accepted, rate " << std::fixed << std::setprecision(3) << acceptrate << " last " << nlast << " " << lastratio << std::endl;
+    // }
+    // else{
+    //   std::cout << "set " << i << " rejected, rate " << std::fixed << std::setprecision(3) << acceptrate << " last " << nlast << " " << lastratio << std::endl;
+    // }
+
+    ntested++;
+
+    //update S matrix
+    TMatrixDSym SNminusoneT(SNminusone);
+    SNminusoneT.T();
+    double etan = std::min(1.0, nparams*pow(double(i), -2.0/3.0));
+    TMatrixDSym WNWNT(nparams);
+    WNWNT.Zero();
+    for (int row = 0; row < WNWNT.GetNrows(); row++) {
+      for (int col = 0; col < WNWNT.GetNcols(); col++) {
+        WNWNT[row][col] = WN[row]*WN[col]/WN.Norm2Sqr();
+      }
+    }
+    TMatrixDSym SNSNT(identity + WNWNT*etan*(alpha-alphastar));
+    SNSNT = SNSNT.Similarity(SNminusone);
+
+    //SNSNT = (SNminusone*identity*SNminusoneT);
+    TDecompChol chol(SNSNT);
+    bool success = chol.Decompose();
+    assert(success);
+    TMatrixD SNT = chol.GetU();
+    TMatrixD SN(SNT);
+    SN.T();
+    for (int row = 0; row < SN.GetNrows(); row++) {
+      for (int col = 0; col < SN.GetNcols(); col++) {
+        SNminusone[row][col] = SN[row][col];
+      }
+    }
+
+
+
+
+
+
+
+
+
+
+  }
 
   return 1;
-
 }
 
+
+Int_t RooMinuitMCMC::mcmc_func_val()
+{
+
+ RooRealVar mean("mean","mean of gaussian",2,1.5,4) ;
+ RooRealVar sigma("sigma","width of gaussian",1.5,0.5,3) ;
+
+  int n = 0;
+  for (int i = 1500; i < 4000; i++) {
+    mean.setVal(i/1000.0);
+    sigma.setVal(2);
+    RooArgList testset(mean,sigma);
+    std::cout << _func->getVal(testset) << std::endl;
+    n++;
+    // testset.at(0)->Print();
+    // testset.at(1)->Print();
+  }
+
+  return 1;
+}
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1214,17 +1333,17 @@ for (size_t i = 0; i < _floatParamList->getSize()-1; i++) {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-// void RooMinuitMCMC::updateFloatVec()
-// {
-//   _floatParamVec.clear() ;
-//   RooFIter iter = _floatParamList->fwdIterator() ;
-//   RooAbsArg* arg ;
-//   _floatParamVec.resize(_floatParamList->getSize()) ;
-//   Int_t i(0) ;
-//   while((arg=iter.next())) {
-//     _floatParamVec[i++] = arg ;
-//   }
-// }
+void RooMinuitMCMC::updateFloatVec()
+{
+  _floatParamVec.clear() ;
+  RooFIter iter = _floatParamList->fwdIterator() ;
+  RooAbsArg* arg ;
+  _floatParamVec.resize(_floatParamList->getSize()) ;
+  Int_t i(0) ;
+  while((arg=iter.next())) {
+    _floatParamVec[i++] = arg ;
+  }
+}
 
 
 

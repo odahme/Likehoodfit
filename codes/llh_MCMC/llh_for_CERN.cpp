@@ -188,7 +188,7 @@ SNminusone = S1;
 TMatrixDSym SN(nparams);
 SN.Zero();
 
-double first_mu = rnd->Uniform(1,5);
+double first_mu = rnd->Uniform(1,4);
 double first_simga = rnd->Uniform(1,2);
 
 last[0] = first_mu;
@@ -462,7 +462,8 @@ RooDataSet data("data", "data",RooArgSet(x));
 // Create MINUIT interface object
   RooMinuitMCMC m(*nll) ;
 
-m.mcmc();
+nll->Print();
+m.mcmc_func_val();
 
 RooPlot* xframe = mean.frame(Title("RooPlot")) ;
 //data.Print("v");
@@ -488,16 +489,19 @@ for (int i = 800; i < 5200; i++) {
   testrange[n] = i/1000.0;
   mean.setVal(i/1000.0);
   sigma.setVal(real_sigma);
-  RooArgSet testset(mean,sigma);
+  RooArgList testset(mean,sigma);
   testval[n] = nll->getVal(testset);
 //  std::cout << testval[n] << std::endl;
   n++;
+  // testset.at(0)->Print();
+  // testset.at(1)->Print();
 }
+
+
 
 TGraph *testg = new TGraph(testrange,testval);
 c1.cd();
 testg->Draw("A*");
-
 
 
 //turns off the program with mous clic

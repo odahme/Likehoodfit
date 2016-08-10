@@ -51,7 +51,7 @@
 //#include "TMarker.h"
 //#include "TGraph.h"
 //#include "TStopwatch.h"
-//#include "TFitter.h"
+#include "TFitter.h"
 //#include "TMinuit.h"
 //#include "TDirectory.h"
 #include "TMatrixDSym.h"
@@ -84,7 +84,7 @@ using namespace std;
  // ClassImp(RooMinuitMCMC)
  // ;
 
-//TVirtualFitter *RooMinuitMCMC::_theFitter = 0 ;
+TVirtualFitter *RooMinuitMCMC::_theFitter = 0 ;
 
 
 
@@ -124,7 +124,7 @@ RooMinuitMCMC::RooMinuitMCMC(RooAbsReal& function)
   _func = &function ;
   // _logfile = 0 ;
   // _optConst = kFALSE ;
-  // _verbose = kFALSE ;
+  _verbose = kFALSE ;
   // _profile = kFALSE ;
   // _handleLocalErrors = kTRUE ;
   // _printLevel = 1 ;
@@ -366,16 +366,26 @@ Int_t RooMinuitMCMC::mcmc()
 
 Int_t RooMinuitMCMC::mcmc_func_val()
 {
-
- RooRealVar mean("mean","mean of gaussian",2,1.5,4) ;
- RooRealVar sigma("sigma","width of gaussian",1.5,0.5,3) ;
+  std::cout << "start" << std::endl;
+  RooMinuitMCMC* context = (RooMinuitMCMC*) RooMinuitMCMC::_theFitter->GetObjectFit() ;
+  Int_t nPar= context->getNPar();
+  std::cout << nPar << std::endl;
+  Double_t par[nPar];
+  Bool_t verbose = _verbose;
+  RooRealVar mean("mean","mean of gaussian",2,1.5,4) ;
+  RooRealVar sigma("sigma","width of gaussian",1.5,0.5,3) ;
 
   int n = 0;
   for (int i = 1500; i < 4000; i++) {
-    mean.setVal(i/1000.0);
-    sigma.setVal(2);
-    RooArgList testset(mean,sigma);
-    std::cout << _func->getVal(testset) << std::endl;
+    par[0] = (i/1000.0);
+    par[1] = (2.0);
+
+   for(Int_t index= 0; index < nPar; index++) {
+     context->setPdfParamVal(index, par[index],verbose);
+   }
+    RooAbsReal::setHideOffset(kFALSE) ;
+    std::cout << context->_func->getVal() << std::endl;
+    RooAbsReal::setHideOffset(kFALSE) ;
     n++;
     // testset.at(0)->Print();
     // testset.at(1)->Print();
@@ -425,10 +435,10 @@ Int_t RooMinuitMCMC::mcmc_func_val()
 ////////////////////////////////////////////////////////////////////////////////
 /// Enable internal likelihood offsetting for enhanced numeric precision
 
-// void RooMinuitMCMC::setOffsetting(Bool_t flag)
-// {
-//   _func->enableOffsetting(flag) ;
-// }
+void RooMinuitMCMC::setOffsetting(Bool_t flag)
+{
+  _func->enableOffsetting(flag) ;
+}
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1228,19 +1238,19 @@ Int_t RooMinuitMCMC::mcmc_func_val()
 ////////////////////////////////////////////////////////////////////////////////
 /// Modify PDF parameter value by ordinal index (needed by MINUIT)
 
-// Bool_t RooMinuitMCMC::setPdfParamVal(Int_t index, Double_t value, Bool_t verbose)
-// {
-//   //RooRealVar* par = (RooRealVar*)_floatParamList->at(index) ;
-//   RooRealVar* par = (RooRealVar*)_floatParamVec[index] ;
-//
-//   if (par->getVal()!=value) {
-//     if (verbose) cout << par->GetName() << "=" << value << ", " ;
-//     par->setVal(value) ;
-//     return kTRUE ;
-//   }
-//
-//   return kFALSE ;
-// }
+Bool_t RooMinuitMCMC::setPdfParamVal(Int_t index, Double_t value, Bool_t verbose)
+{
+  //RooRealVar* par = (RooRealVar*)_floatParamList->at(index) ;
+  RooRealVar* par = (RooRealVar*)_floatParamVec[index] ;
+
+  if (par->getVal()!=value) {
+    if (verbose) cout << par->GetName() << "=" << value << ", " ;
+    par->setVal(value) ;
+    return kTRUE ;
+  }
+
+  return kFALSE ;
+ }
 
 
 

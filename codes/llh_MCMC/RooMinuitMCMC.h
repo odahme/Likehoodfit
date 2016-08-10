@@ -30,7 +30,7 @@ class RooArgList ;
 //class RooRealVar ;
 //class RooArgSet ;
 class RooAbsArg ;
-//class TVirtualFitter ;
+class TVirtualFitter ;
 //class TH2F ;
 //class RooPlot ;
 
@@ -49,7 +49,7 @@ public:
   // void setEps(Double_t eps) ;
   // void optimizeConst(Int_t flag) ;
   // void setEvalErrorWall(Bool_t flag) { _doEvalErrorWall = flag ; }
-  // void setOffsetting(Bool_t flag) ;
+   void setOffsetting(Bool_t flag) ;
 
 //  RooFitResult* fit(const char* options) ;
 
@@ -82,7 +82,7 @@ public:
   // Int_t evalCounter() const { return _evalCounter ; }
   // void zeroEvalCount() { _evalCounter = 0 ; }
 
-// protected:
+ protected:
 //
 //   friend class RooAbsPdf ;
 //   void applyCovarianceMatrix(TMatrixDSym& V) ;
@@ -95,13 +95,13 @@ public:
 // //  Bool_t synchronize(Bool_t verbose) ;
 //   void backProp() ;
 //
-//   inline Int_t getNPar() const { return _nPar ; }
+   inline Int_t getNPar() const { return _nPar ; }
 //   inline std::ofstream* logfile() const { return _logfile ; }
 //   inline Double_t& maxFCN() { return _maxFCN ; }
 //
 //   Double_t getPdfParamVal(Int_t index) ;
 //   Double_t getPdfParamErr(Int_t index) ;
-//   virtual Bool_t setPdfParamVal(Int_t index, Double_t value, Bool_t verbose=kFALSE) ;
+   virtual Bool_t setPdfParamVal(Int_t index, Double_t value, Bool_t verbose=kFALSE) ;
 //   void setPdfParamErr(Int_t index, Double_t value) ;
 //   void setPdfParamErr(Int_t index, Double_t loVal, Double_t hiVal) ;
 //   void clearPdfParamAsymErr(Int_t index) ;
@@ -133,13 +133,13 @@ public:
 //
 //   Double_t    _maxFCN ;
 //   std::ofstream*   _logfile ;
-//   Bool_t      _verbose ;
+   Bool_t      _verbose ;
 //   TStopwatch  _timer ;
 //   TStopwatch  _cumulTimer ;
 //
 //   TMatrixDSym* _extV ;
 //
-//   static TVirtualFitter *_theFitter ;
+   static TVirtualFitter *_theFitter ;
 //
 //   std::vector<std::pair<std::string,int> > _statusHistory ;
 //

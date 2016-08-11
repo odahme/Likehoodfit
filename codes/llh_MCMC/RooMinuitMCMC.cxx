@@ -46,10 +46,10 @@
 //
 // #include <fstream>
 //#include <iomanip>
-//#include "TH1.h"
+#include "TH1.h"
 //#include "TH2.h"
-//#include "TMarker.h"
-//#include "TGraph.h"
+#include "TMarker.h"
+#include "TGraph.h"
 //#include "TStopwatch.h"
 #include "TFitter.h"
 //#include "TMinuit.h"
@@ -221,14 +221,14 @@ RooMinuitMCMC::~RooMinuitMCMC()
 }
 
 
-Int_t RooMinuitMCMC::mcmc()
+Int_t RooMinuitMCMC::mcmc(Int_t npoints)
 {
   TRandom3 *rnd = new TRandom3(35); //random generator with seed
   unsigned int nparams = _nPar; //number of parameters
-  unsigned int nstat = 1000;//number of tries
+  unsigned int nstat = npoints*10;//number of tries
   double maxstep = 0.01; //maximum step size
   double alphastar = 0.234; //forced acceptance rate
-  _pointlist.reserve(nstat);
+  _pointlist.reserve(npoints);
 
 
   Bool_t accepted;
@@ -237,7 +237,7 @@ Int_t RooMinuitMCMC::mcmc()
 
   RooArgList* last = (RooArgList*) _floatParamList->snapshot(kTRUE);
   RooArgList* curr = (RooArgList*) _floatParamList->snapshot(kTRUE);
-  RooRealVar nllval("nllval","nllval of parameters",-1);
+  RooRealVar* nllval = new RooRealVar("nllval","nllval of parameters",-1);
 
   double minllh = 1e32;
 
@@ -300,11 +300,8 @@ Int_t RooMinuitMCMC::mcmc()
     double llh_curr = context->_func->getVal(); //get nll for current parameters
     RooAbsReal::setHideOffset(kFALSE) ;
 
-    std::cout << "nll curr = "<< llh_curr << std::endl;
-    nllval.setVal(llh_curr);
-    RooArgList point(*curr);
-    point.add(nllval);;
-    _pointlist.push_back(point);
+
+
 
     if (llh_curr < minllh) {
       minllh = llh_curr;
@@ -319,6 +316,12 @@ Int_t RooMinuitMCMC::mcmc()
       //success
       accepted = true;
       naccepted++;
+
+      nllval->setVal(llh_curr);
+      RooArgList* point = (RooArgList*) curr->snapshot(kFALSE);
+      point->addClone(*nllval);
+      _pointlist.push_back(point);
+
       last = (RooArgList*) curr->snapshot(kTRUE);
     } else {
       //reset to last candidate
@@ -374,7 +377,15 @@ Int_t RooMinuitMCMC::mcmc()
         SNminusone[row][col] = SN[row][col];
       }
     }
+    if (naccepted == npoints) {
+      break;
+    }
   }
+
+// for (size_t i = 0; i < _pointlist.size(); i++) {
+//   RooArgList point = (RooArgList) _pointlist[i];
+//   point.Print("s");
+// }
 
 
   std::cout << ntested << " points were tested" << std::endl;
@@ -415,14 +426,33 @@ Int_t RooMinuitMCMC::mcmc_func_val()
   return 1;
 }
 
-Int_t RooMinuitMCMC::getProfiles()
+TGraph RooMinuitMCMC::getProfiles(const char* name)
 {
   if (_pointlist.size() == 0) {
-    std::cout << "point list empty. Please run mcmc()" << std::endl;
-    return -1;
+    std::cout << "point list empty. Please run mcmc() first" << std::endl;
   }
 
-  return 1;
+  unsigned int np = _pointlist.size();
+  TVectorD x(np);
+  TVectorD y(np);
+
+  std::cout << "start drawing points" << std::endl;
+  for (unsigned int i = 0; i < np; i++) {
+    RooArgList* point = (RooArgList*) _pointlist[i];
+    point->Print("v");
+    RooRealVar* var1 = (RooRealVar*) point->selectByName(name);
+    var1->Print("v");
+    RooRealVar* var2 = (RooRealVar*) point->selectByName("nllval");
+    var2->Print("v");
+    x[i] = var1->getVal();
+    std::cout << "mean = "<< x[i] << std::endl;
+    y[i] = var2->getVal();
+    std::cout << "nll = "<< y[i] << std::endl;
+
+  }
+  TGraph *gr = new TGraph(x,y);
+
+  return *gr;
 }
 ////////////////////////////////////////////////////////////////////////////////
 /// Change MINUIT strategy to istrat. Accepted codes

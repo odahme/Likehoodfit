@@ -32,7 +32,7 @@ class RooArgList ;
 class RooAbsArg ;
 class TVirtualFitter ;
 //class TH2F ;
-//class RooPlot ;
+class RooPlot ;
 
 //void RooMinuitMCMCGlue(Int_t& /*np*/, Double_t* /*gin*/,  Double_t &f, Double_t *par, Int_t /*flag*/) ;
 
@@ -53,9 +53,9 @@ public:
 
 //  RooFitResult* fit(const char* options) ;
 
-  Int_t mcmc();
+  Int_t mcmc(Int_t npoints);
   Int_t mcmc_func_val();
-  Int_t getProfiles();
+  TGraph getProfiles(const char* name);
   // Int_t migrad() ;
   // Int_t hesse() ;
 //  Int_t minos() ;
@@ -131,7 +131,7 @@ public:
    RooArgList* _constParamList ;
    RooArgList* _initConstParamList ;
    RooAbsReal* _func ;
-   std::vector<RooArgList> _pointlist;
+   std::vector<RooArgList*> _pointlist;
 //
 //   Double_t    _maxFCN ;
 //   std::ofstream*   _logfile ;

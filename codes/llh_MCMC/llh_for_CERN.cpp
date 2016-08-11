@@ -463,10 +463,10 @@ RooDataSet data("data", "data",RooArgSet(x));
   RooMinuitMCMC m(*nll) ;
 
 nll->Print();
-m.mcmc();
+m.mcmc(1000);
 
 
-RooPlot* xframe = mean.frame(Title("RooPlot")) ;
+TGraph frame = m.getProfiles("mean");
 //data.Print("v");
 //cout << endl ;
 //gauss.fitTo(data);
@@ -475,12 +475,12 @@ RooPlot* xframe = mean.frame(Title("RooPlot")) ;
 
 //data->plotOn(xframe) ;
 //model.plotOn(xframe) ;
-nll->plotOn(xframe);
-xframe->SetAxisRange(-10,10);
+//nll->plotOn(xframe);
+//xframe->SetAxisRange(-10,10);
 
 //root fit stuff end
 c2.cd();
-xframe->Draw();
+frame.Draw();
 
 // TVectorD testrange(5400);
 // TVectorD testval(5400);

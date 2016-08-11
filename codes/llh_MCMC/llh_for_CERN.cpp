@@ -463,7 +463,8 @@ RooDataSet data("data", "data",RooArgSet(x));
   RooMinuitMCMC m(*nll) ;
 
 nll->Print();
-m.mcmc_func_val();
+m.mcmc();
+
 
 RooPlot* xframe = mean.frame(Title("RooPlot")) ;
 //data.Print("v");
@@ -481,27 +482,24 @@ xframe->SetAxisRange(-10,10);
 c2.cd();
 xframe->Draw();
 
-TVectorD testrange(5400);
-TVectorD testval(5400);
-
-int n = 0;
-for (int i = 800; i < 5200; i++) {
-  testrange[n] = i/1000.0;
-  mean.setVal(i/1000.0);
-  sigma.setVal(real_sigma);
-  RooArgList testset(mean,sigma);
-  testval[n] = nll->getVal(testset);
-//  std::cout << testval[n] << std::endl;
-  n++;
-  // testset.at(0)->Print();
-  // testset.at(1)->Print();
-}
-
-
-
-TGraph *testg = new TGraph(testrange,testval);
-c1.cd();
-testg->Draw("A*");
+// TVectorD testrange(5400);
+// TVectorD testval(5400);
+//
+// int n = 0;
+// for (int i = 800; i < 5200; i++) {
+//   testrange[n] = i/1000.0;
+//   mean.setVal(i/1000.0);
+//   sigma.setVal(real_sigma);
+//   RooArgList testset(mean,sigma);
+//   testval[n] = nll->getVal(testset);
+// //  std::cout << testval[n] << std::endl;
+//   n++;
+//   // testset.at(0)->Print();
+//   // testset.at(1)->Print();
+// }
+// TGraph *testg = new TGraph(testrange,testval);
+// c1.cd();
+// testg->Draw("A*");
 
 
 //turns off the program with mous clic

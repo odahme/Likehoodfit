@@ -55,6 +55,7 @@ public:
 
   Int_t mcmc();
   Int_t mcmc_func_val();
+  Int_t getProfiles();
   // Int_t migrad() ;
   // Int_t hesse() ;
 //  Int_t minos() ;
@@ -68,7 +69,7 @@ public:
 		  //  Double_t n1=1, Double_t n2=2, Double_t n3=0,
 		  //  Double_t n4=0, Double_t n5=0, Double_t n6=0) ;
 
-  // Int_t setPrintLevel(Int_t newLevel) ;
+  Int_t setPrintLevel(Int_t newLevel) ;
   // void setNoWarn() ;
   // Int_t setWarnLevel(Int_t newLevel) ;
   // void setPrintEvalErrors(Int_t numEvalErrors) { _printEvalErrors = numEvalErrors ; }
@@ -77,7 +78,7 @@ public:
   // void setMaxEvalMultiplier(Int_t n) { _maxEvalMult = n ; }
   // Bool_t setLogFile(const char* logfile=0) ;
 
-  // static void cleanup() ;
+  static void cleanup() ;
 
   // Int_t evalCounter() const { return _evalCounter ; }
   // void zeroEvalCount() { _evalCounter = 0 ; }
@@ -113,7 +114,7 @@ public:
  private:
 //
 //   Int_t       _evalCounter ;
-//   Int_t       _printLevel ;
+   Int_t       _printLevel ;
 //   Int_t       _warnLevel ;
 //   Int_t       _status ;
 //   Int_t       _optConst ;
@@ -130,6 +131,7 @@ public:
    RooArgList* _constParamList ;
    RooArgList* _initConstParamList ;
    RooAbsReal* _func ;
+   std::vector<RooArgList> _pointlist;
 //
 //   Double_t    _maxFCN ;
 //   std::ofstream*   _logfile ;

@@ -72,6 +72,8 @@
 #include <TRandom3.h>
 #include "RooDataSet.h"
 #include "TDecompChol.h"
+#include <TCanvas.h>
+#include <iostream>
 
 
 
@@ -92,13 +94,13 @@ TVirtualFitter *RooMinuitMCMC::_theFitter = 0 ;
 /// Cleanup method called by atexit handler installed by RooSentinel
 /// to delete all global heap objects when the program is terminated
 
-// void RooMinuitMCMC::cleanup()
-// {
-//   if (_theFitter) {
-//     delete _theFitter ;
-//     _theFitter =0 ;
-//   }
-// }
+void RooMinuitMCMC::cleanup()
+{
+  if (_theFitter) {
+    delete _theFitter ;
+    _theFitter =0 ;
+  }
+}
 
 
 
@@ -170,14 +172,14 @@ RooMinuitMCMC::RooMinuitMCMC(RooAbsReal& function)
    _initConstParamList = (RooArgList*) _constParamList->snapshot(kFALSE) ;
 //
 //   // Initialize MINUIT
-//   Int_t nPar= _floatParamList->getSize() + _constParamList->getSize() ;
-//   if (_theFitter) delete _theFitter ;
-//   _theFitter = new TFitter(nPar*2+1) ; //WVE Kludge, nPar*2 works around TMinuit memory allocation bug
-//   _theFitter->SetObjectFit(this) ;
-//
-//   // Shut up for now
-//   setPrintLevel(-1) ;
-//   _theFitter->Clear();
+   Int_t nPar= _floatParamList->getSize() + _constParamList->getSize() ;
+   if (_theFitter) delete _theFitter ;
+   _theFitter = new TFitter(nPar*2+1) ; //WVE Kludge, nPar*2 works around TMinuit memory allocation bug
+   _theFitter->SetObjectFit(this) ;
+
+  // Shut up for now
+  setPrintLevel(-1) ;
+  _theFitter->Clear();
 //
 //   // Tell MINUIT to use our global glue function
 //   _theFitter->SetFCN(RooMinuitMCMCGlue);
@@ -221,12 +223,12 @@ RooMinuitMCMC::~RooMinuitMCMC()
 
 Int_t RooMinuitMCMC::mcmc()
 {
-  _func->Print();
   TRandom3 *rnd = new TRandom3(35); //random generator with seed
   unsigned int nparams = _nPar; //number of parameters
-  unsigned int nstat = 5;//number of tries
+  unsigned int nstat = 1000;//number of tries
   double maxstep = 0.01; //maximum step size
   double alphastar = 0.234; //forced acceptance rate
+  _pointlist.reserve(nstat);
 
 
   Bool_t accepted;
@@ -235,10 +237,8 @@ Int_t RooMinuitMCMC::mcmc()
 
   RooArgList* last = (RooArgList*) _floatParamList->snapshot(kTRUE);
   RooArgList* curr = (RooArgList*) _floatParamList->snapshot(kTRUE);
+  RooRealVar nllval("nllval","nllval of parameters",-1);
 
-
-  // TVectorD llh_p(nstat);
-  // TVectorD mu_p(nstat);
   double minllh = 1e32;
 
   unsigned int nlast = 200;
@@ -256,6 +256,12 @@ Int_t RooMinuitMCMC::mcmc()
   TMatrixDSym SN(nparams);
   SN.Zero();
 
+  RooMinuitMCMC* context = (RooMinuitMCMC*) RooMinuitMCMC::_theFitter->GetObjectFit() ;
+  Int_t nPar= context->getNPar();
+  std::cout << nPar << std::endl;
+  Double_t par[nPar];
+  Bool_t verbose = _verbose;
+
   for (unsigned int i = 0; i < nstat; i++) {
      curr = (RooArgList*) last->snapshot(kTRUE);//use value of last for current then vary
 
@@ -266,19 +272,39 @@ Int_t RooMinuitMCMC::mcmc()
     }
     TVectorD SW(SNminusone*WN);
 
-    for (int i = 0; i < curr->getSize(); i++) {
-      RooRealVar* var = (RooRealVar*) curr->at(i);
-      double calc = var->getVal() + SW[i] ;
-      var->setVal(calc);
+
+    for (int j = 0; j < nPar; j++) {
+      RooRealVar* var = (RooRealVar*) last->at(j);
+      double calc = var->getVal();
+      par[j] = calc;
     }
 
+    for(Int_t index= 0; index < nPar; index++) {
+      context->setPdfParamVal(index, par[index],verbose);
+    }
+    RooAbsReal::setHideOffset(kFALSE) ;
+    double llh_last = context->_func->getVal(); //get nll for last parameters
+    RooAbsReal::setHideOffset(kFALSE) ;
 
+    for (int j = 0; j < nPar; j++) {
+      RooRealVar* var = (RooRealVar*) curr->at(j);
+      double calc = var->getVal() + SW[j] ;
+      var->setVal(calc);
+      par[j] = calc;
+    }
 
-    //get llh for current and last
-    double llh_last = _func->getVal(*last);
-    double llh_curr = _func->getVal(*curr);
-    std::cout << "lastllh = "<< llh_last << std::endl;
-    std::cout << "currllh = "<< llh_curr << std::endl;
+    for(Int_t index= 0; index < nPar; index++) {
+      context->setPdfParamVal(index, par[index],verbose);
+    }
+    RooAbsReal::setHideOffset(kFALSE) ;
+    double llh_curr = context->_func->getVal(); //get nll for current parameters
+    RooAbsReal::setHideOffset(kFALSE) ;
+
+    std::cout << "nll curr = "<< llh_curr << std::endl;
+    nllval.setVal(llh_curr);
+    RooArgList point(*curr);
+    point.add(nllval);;
+    _pointlist.push_back(point);
 
     if (llh_curr < minllh) {
       minllh = llh_curr;
@@ -293,11 +319,11 @@ Int_t RooMinuitMCMC::mcmc()
       //success
       accepted = true;
       naccepted++;
-      last = (RooArgList*) curr->snapshot(kFALSE);
+      last = (RooArgList*) curr->snapshot(kTRUE);
     } else {
       //reset to last candidate
       accepted = false;
-      curr = (RooArgList*) last->snapshot(kFALSE);
+      curr = (RooArgList*) last->snapshot(kTRUE);
     }
 
     lastaccepted.insert(lastaccepted.begin(), accepted);
@@ -348,17 +374,12 @@ Int_t RooMinuitMCMC::mcmc()
         SNminusone[row][col] = SN[row][col];
       }
     }
-
-
-
-
-
-
-
-
-
-
   }
+
+
+  std::cout << ntested << " points were tested" << std::endl;
+  std::cout << naccepted << " points were accepted" << std::endl;
+  std::cout << "The accept fraction is " << double(naccepted)/double(ntested) << std::endl;
 
   return 1;
 }
@@ -394,7 +415,15 @@ Int_t RooMinuitMCMC::mcmc_func_val()
   return 1;
 }
 
+Int_t RooMinuitMCMC::getProfiles()
+{
+  if (_pointlist.size() == 0) {
+    std::cout << "point list empty. Please run mcmc()" << std::endl;
+    return -1;
+  }
 
+  return 1;
+}
 ////////////////////////////////////////////////////////////////////////////////
 /// Change MINUIT strategy to istrat. Accepted codes
 /// are 0,1,2 and represent MINUIT strategies for dealing
@@ -749,14 +778,14 @@ void RooMinuitMCMC::setOffsetting(Bool_t flag)
 ////////////////////////////////////////////////////////////////////////////////
 /// Change the MINUIT internal printing level
 
-// Int_t RooMinuitMCMC::setPrintLevel(Int_t newLevel)
-// {
-//   Int_t ret = _printLevel ;
-//   Double_t arg(newLevel) ;
-//   _theFitter->ExecuteCommand("SET PRINT",&arg,1);
-//   _printLevel = newLevel ;
-//   return ret ;
-// }
+Int_t RooMinuitMCMC::setPrintLevel(Int_t newLevel)
+{
+  Int_t ret = _printLevel ;
+  Double_t arg(newLevel) ;
+  _theFitter->ExecuteCommand("SET PRINT",&arg,1);
+  _printLevel = newLevel ;
+  return ret ;
+}
 
 
 

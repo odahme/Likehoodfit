@@ -221,7 +221,7 @@ RooMinuitMCMC::~RooMinuitMCMC()
 }
 
 
-Int_t RooMinuitMCMC::mcmc(Int_t npoints)
+Int_t RooMinuitMCMC::mcmc(Int_t npoints, Int_t cutoff)
 {
   TRandom3 *rnd = new TRandom3(35); //random generator with seed
   unsigned int nparams = _nPar; //number of parameters
@@ -229,6 +229,7 @@ Int_t RooMinuitMCMC::mcmc(Int_t npoints)
   double maxstep = 0.01; //maximum step size
   double alphastar = 0.234; //forced acceptance rate
   _pointlist.reserve(npoints);
+  _cutofflist.reserve(npoints - cutoff);
 
 
   Bool_t accepted;
@@ -315,12 +316,11 @@ Int_t RooMinuitMCMC::mcmc(Int_t npoints)
     if (r < alpha) {
       //success
       accepted = true;
-      naccepted++;
-
       nllval->setVal(llh_curr);
-      RooArgList* point = (RooArgList*) curr->snapshot(kFALSE);
+      RooArgList* point = (RooArgList*) curr->snapshot(kTRUE);
       point->addClone(*nllval);
       _pointlist.push_back(point);
+      naccepted++;
 
       last = (RooArgList*) curr->snapshot(kTRUE);
     } else {
@@ -382,10 +382,10 @@ Int_t RooMinuitMCMC::mcmc(Int_t npoints)
     }
   }
 
-// for (size_t i = 0; i < _pointlist.size(); i++) {
-//   RooArgList point = (RooArgList) _pointlist[i];
-//   point.Print("s");
-// }
+  for (size_t i = cutoff; i < _pointlist.size(); i++) {
+    RooArgList* point = (RooArgList*) _pointlist[i];
+    _cutofflist.push_back(point);
+  }
 
 
   std::cout << ntested << " points were tested" << std::endl;
@@ -426,34 +426,110 @@ Int_t RooMinuitMCMC::mcmc_func_val()
   return 1;
 }
 
-TGraph RooMinuitMCMC::getProfiles(const char* name)
+TGraph RooMinuitMCMC::getProfile(const char* name, Bool_t cutoff)
 {
   if (_pointlist.size() == 0) {
     std::cout << "point list empty. Please run mcmc() first" << std::endl;
   }
 
-  unsigned int np = _pointlist.size();
-  TVectorD x(np);
-  TVectorD y(np);
-
-  std::cout << "start drawing points" << std::endl;
-  for (unsigned int i = 0; i < np; i++) {
-    RooArgList* point = (RooArgList*) _pointlist[i];
-    point->Print("v");
-    RooRealVar* var1 = (RooRealVar*) point->selectByName(name);
-    var1->Print("v");
-    RooRealVar* var2 = (RooRealVar*) point->selectByName("nllval");
-    var2->Print("v");
-    x[i] = var1->getVal();
-    std::cout << "mean = "<< x[i] << std::endl;
-    y[i] = var2->getVal();
-    std::cout << "nll = "<< y[i] << std::endl;
-
+  unsigned int index = 0;
+  for (int i = 0; i < _nPar; i++) {
+    RooArgList* point = (RooArgList*) _pointlist[0];
+    RooRealVar* var1 = (RooRealVar*) point->at(i);
+    std::cout << "var1 = "<< var1->GetName() << std::endl;
+    std::cout << name << std::endl;
+    char* varname = (char*) var1->GetName();
+    std::cout << varname << std::endl;
+    if (varname == name) {
+      index = i;
+      std::cout << index << std::endl;
+      break;
+    }
   }
-  TGraph *gr = new TGraph(x,y);
 
-  return *gr;
+  if (cutoff) {
+    unsigned int np = _cutofflist.size();
+    TVectorD x(np);
+    TVectorD y(np);
+
+    for (unsigned int i = 0; i < np; i++) {
+      RooArgList* point = (RooArgList*) _cutofflist[i];
+      RooRealVar* var1 = (RooRealVar*) point->at(index);
+      RooRealVar* var2 = (RooRealVar*) point->at(_nPar);
+      x[i] = var1->getVal();
+      y[i] = var2->getVal();
+    }
+    TGraph *gr = new TGraph(x,y);
+
+    return *gr;
+  } else {
+    unsigned int np = _pointlist.size();
+    TVectorD x(np);
+    TVectorD y(np);
+
+    for (unsigned int i = 0; i < np; i++) {
+      RooArgList* point = (RooArgList*) _pointlist[i];
+      RooRealVar* var1 = (RooRealVar*) point->at(index);
+      RooRealVar* var2 = (RooRealVar*) point->at(_nPar);
+      x[i] = var1->getVal();
+      y[i] = var2->getVal();
+    }
+    TGraph *gr = new TGraph(x,y);
+
+    return *gr;
+  }
+
 }
+
+TGraph RooMinuitMCMC::getStepProfile(const char* name, Bool_t cutoff)
+{
+  if (_pointlist.size() == 0) {
+    std::cout << "point list empty. Please run mcmc() first" << std::endl;
+  }
+
+  unsigned int index = 0;
+  for (int i = 0; i < _nPar; i++) {
+    RooArgList* point = (RooArgList*) _pointlist[0];
+    RooRealVar* var1 = (RooRealVar*) point->at(i);
+    RooRealVar* var2 = (RooRealVar*) point->selectByName(name);
+    if (var1->IsEqual(var2)) {
+      index = i;
+      break;
+    }
+  }
+
+  if (cutoff) {
+    unsigned int np = _cutofflist.size();
+    TVectorD x(np);
+    TVectorD y(np);
+
+    for (unsigned int i = 0; i < np; i++) {
+      RooArgList* point = (RooArgList*) _cutofflist[i];
+      RooRealVar* var1 = (RooRealVar*) point->at(index);
+      x[i] = cutoff+i;
+      y[i] = var1->getVal();
+    }
+    TGraph *gr = new TGraph(x,y);
+
+    return *gr;
+  } else {
+    unsigned int np = _pointlist.size();
+    TVectorD x(np);
+    TVectorD y(np);
+
+    for (unsigned int i = 0; i < np; i++) {
+      RooArgList* point = (RooArgList*) _pointlist[i];
+      RooRealVar* var1 = (RooRealVar*) point->at(index);
+      x[i] = i;
+      y[i] = var1->getVal();
+    }
+    TGraph *gr = new TGraph(x,y);
+  }
+
+
+}
+
+
 ////////////////////////////////////////////////////////////////////////////////
 /// Change MINUIT strategy to istrat. Accepted codes
 /// are 0,1,2 and represent MINUIT strategies for dealing

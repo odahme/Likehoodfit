@@ -434,10 +434,10 @@ for (unsigned int i = 0; i < nstat*0.68; i++) {
 
 
 
-TGraph *gr = new TGraph(mu_p,llh_p);
-c1.cd();
-gr->Draw("A*");
-c1.SaveAs("lastllh.png");
+// TGraph *gr = new TGraph(mu_p,llh_p);
+// c1.cd();
+// gr->Draw("A*");
+// c1.SaveAs("lastllh.png");
 //c2.cd();
 //hist->Fit("gaus");
 //hist->Draw();
@@ -463,10 +463,11 @@ RooDataSet data("data", "data",RooArgSet(x));
   RooMinuitMCMC m(*nll) ;
 
 nll->Print();
-m.mcmc(1000);
+m.mcmc(1000,100);
 
 
-TGraph frame = m.getProfiles("mean");
+TGraph profile = m.getProfile("sigma",kTRUE);
+TGraph stepProfil = m.getStepProfile("mean",kTRUE);
 //data.Print("v");
 //cout << endl ;
 //gauss.fitTo(data);
@@ -479,8 +480,10 @@ TGraph frame = m.getProfiles("mean");
 //xframe->SetAxisRange(-10,10);
 
 //root fit stuff end
+c1.cd();
+profile.Draw();
 c2.cd();
-frame.Draw();
+stepProfil.Draw();
 
 // TVectorD testrange(5400);
 // TVectorD testval(5400);

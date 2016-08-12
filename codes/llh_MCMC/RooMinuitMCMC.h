@@ -53,9 +53,10 @@ public:
 
 //  RooFitResult* fit(const char* options) ;
 
-  Int_t mcmc(Int_t npoints);
+  Int_t mcmc(Int_t npoints, Int_t cutoff);
   Int_t mcmc_func_val();
-  TGraph getProfiles(const char* name);
+  TGraph getProfile(const char* name, Bool_t cutoff = kTRUE);
+  TGraph getStepProfile(const char* name, Bool_t cutoff = kTRUE);
   // Int_t migrad() ;
   // Int_t hesse() ;
 //  Int_t minos() ;
@@ -132,6 +133,7 @@ public:
    RooArgList* _initConstParamList ;
    RooAbsReal* _func ;
    std::vector<RooArgList*> _pointlist;
+   std::vector<RooArgList*> _cutofflist;
 //
 //   Double_t    _maxFCN ;
 //   std::ofstream*   _logfile ;

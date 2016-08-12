@@ -57,6 +57,7 @@ public:
   Int_t mcmc_func_val();
   TGraph getProfile(const char* name, Bool_t cutoff = kTRUE);
   TGraph getStepProfile(const char* name, Bool_t cutoff = kTRUE);
+  Int_t changeCutoff(Int_t newCutoff);
   // Int_t migrad() ;
   // Int_t hesse() ;
 //  Int_t minos() ;
@@ -126,6 +127,7 @@ public:
 //   Int_t       _printEvalErrors ;
 //   Bool_t      _doEvalErrorWall ;
 //   Int_t       _maxEvalMult ;
+   Int_t       _cutoff;
    RooArgList* _floatParamList ;
    std::vector<RooAbsArg*> _floatParamVec ;
    RooArgList* _initFloatParamList ;

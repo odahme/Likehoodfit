@@ -228,6 +228,7 @@ Int_t RooMinuitMCMC::mcmc(Int_t npoints, Int_t cutoff)
   unsigned int nstat = npoints*10;//number of tries
   double maxstep = 0.01; //maximum step size
   double alphastar = 0.234; //forced acceptance rate
+  _cutoff = cutoff;
   _pointlist.reserve(npoints);
   _cutofflist.reserve(npoints - cutoff);
 
@@ -437,10 +438,10 @@ TGraph RooMinuitMCMC::getProfile(const char* name, Bool_t cutoff)
     RooArgList* point = (RooArgList*) _pointlist[0];
     RooRealVar* var1 = (RooRealVar*) point->at(i);
     std::cout << "var1 = "<< var1->GetName() << std::endl;
-    std::cout << name << std::endl;
-    char* varname = (char*) var1->GetName();
-    std::cout << varname << std::endl;
-    if (varname == name) {
+    std::cout << (int*) name << std::endl;
+    const char* varname = var1->GetName();
+    std::cout << (int*) varname << std::endl;
+    if (strcmp(name, varname) == 0) {
       index = i;
       std::cout << index << std::endl;
       break;
@@ -491,9 +492,10 @@ TGraph RooMinuitMCMC::getStepProfile(const char* name, Bool_t cutoff)
   for (int i = 0; i < _nPar; i++) {
     RooArgList* point = (RooArgList*) _pointlist[0];
     RooRealVar* var1 = (RooRealVar*) point->at(i);
-    RooRealVar* var2 = (RooRealVar*) point->selectByName(name);
-    if (var1->IsEqual(var2)) {
+    const char* varname = var1->GetName();
+    if (strcmp(name, varname) == 0) {
       index = i;
+      std::cout << index << std::endl;
       break;
     }
   }
@@ -506,11 +508,10 @@ TGraph RooMinuitMCMC::getStepProfile(const char* name, Bool_t cutoff)
     for (unsigned int i = 0; i < np; i++) {
       RooArgList* point = (RooArgList*) _cutofflist[i];
       RooRealVar* var1 = (RooRealVar*) point->at(index);
-      x[i] = cutoff+i;
+      x[i] = _cutoff+i;
       y[i] = var1->getVal();
     }
     TGraph *gr = new TGraph(x,y);
-
     return *gr;
   } else {
     unsigned int np = _pointlist.size();
@@ -524,12 +525,21 @@ TGraph RooMinuitMCMC::getStepProfile(const char* name, Bool_t cutoff)
       y[i] = var1->getVal();
     }
     TGraph *gr = new TGraph(x,y);
+    return *gr;
   }
 
 
 }
 
-
+Int_t RooMinuitMCMC::changeCutoff(Int_t newCutoff)
+{
+  _cutoff = newCutoff;
+  _cutofflist.clear();
+  for (size_t i = newCutoff; i < _pointlist.size(); i++) {
+    RooArgList* point = (RooArgList*) _pointlist[i];
+    _cutofflist.push_back(point);
+  }
+}
 ////////////////////////////////////////////////////////////////////////////////
 /// Change MINUIT strategy to istrat. Accepted codes
 /// are 0,1,2 and represent MINUIT strategies for dealing

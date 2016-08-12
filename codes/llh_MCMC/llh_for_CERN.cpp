@@ -464,10 +464,11 @@ RooDataSet data("data", "data",RooArgSet(x));
 
 nll->Print();
 m.mcmc(1000,100);
+m.changeCutoff(950);
 
 
 TGraph profile = m.getProfile("sigma",kTRUE);
-TGraph stepProfil = m.getStepProfile("mean",kTRUE);
+TGraph stepProfil = m.getStepProfile("sigma",kTRUE);
 //data.Print("v");
 //cout << endl ;
 //gauss.fitTo(data);

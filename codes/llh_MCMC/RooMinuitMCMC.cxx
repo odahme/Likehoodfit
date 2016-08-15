@@ -260,7 +260,6 @@ Int_t RooMinuitMCMC::mcmc(Int_t npoints, Int_t cutoff)
 
   RooMinuitMCMC* context = (RooMinuitMCMC*) RooMinuitMCMC::_theFitter->GetObjectFit() ;
   Int_t nPar= context->getNPar();
-  std::cout << nPar << std::endl;
   Double_t par[nPar];
   Bool_t verbose = _verbose;
 
@@ -389,43 +388,13 @@ Int_t RooMinuitMCMC::mcmc(Int_t npoints, Int_t cutoff)
   }
 
 
-  std::cout << ntested << " points were tested" << std::endl;
-  std::cout << naccepted << " points were accepted" << std::endl;
-  std::cout << "The accept fraction is " << double(naccepted)/double(ntested) << std::endl;
+  // std::cout << ntested << " points were tested" << std::endl;
+  // std::cout << naccepted << " points were accepted" << std::endl;
+  // std::cout << "The accept fraction is " << double(naccepted)/double(ntested) << std::endl;
 
   return 1;
 }
 
-
-Int_t RooMinuitMCMC::mcmc_func_val()
-{
-  std::cout << "start" << std::endl;
-  RooMinuitMCMC* context = (RooMinuitMCMC*) RooMinuitMCMC::_theFitter->GetObjectFit() ;
-  Int_t nPar= context->getNPar();
-  std::cout << nPar << std::endl;
-  Double_t par[nPar];
-  Bool_t verbose = _verbose;
-  RooRealVar mean("mean","mean of gaussian",2,1.5,4) ;
-  RooRealVar sigma("sigma","width of gaussian",1.5,0.5,3) ;
-
-  int n = 0;
-  for (int i = 1500; i < 4000; i++) {
-    par[0] = (i/1000.0);
-    par[1] = (2.0);
-
-   for(Int_t index= 0; index < nPar; index++) {
-     context->setPdfParamVal(index, par[index],verbose);
-   }
-    RooAbsReal::setHideOffset(kFALSE) ;
-    std::cout << context->_func->getVal() << std::endl;
-    RooAbsReal::setHideOffset(kFALSE) ;
-    n++;
-    // testset.at(0)->Print();
-    // testset.at(1)->Print();
-  }
-
-  return 1;
-}
 
 TGraph RooMinuitMCMC::getProfile(const char* name, Bool_t cutoff)
 {
@@ -437,13 +406,10 @@ TGraph RooMinuitMCMC::getProfile(const char* name, Bool_t cutoff)
   for (int i = 0; i < _nPar; i++) {
     RooArgList* point = (RooArgList*) _pointlist[0];
     RooRealVar* var1 = (RooRealVar*) point->at(i);
-    std::cout << "var1 = "<< var1->GetName() << std::endl;
-    std::cout << (int*) name << std::endl;
     const char* varname = var1->GetName();
     std::cout << (int*) varname << std::endl;
     if (strcmp(name, varname) == 0) {
       index = i;
-      std::cout << index << std::endl;
       break;
     }
   }
@@ -535,11 +501,74 @@ Int_t RooMinuitMCMC::changeCutoff(Int_t newCutoff)
 {
   _cutoff = newCutoff;
   _cutofflist.clear();
+  _cutofflist.reserve(_pointlist.size() - newCutoff);
   for (size_t i = newCutoff; i < _pointlist.size(); i++) {
     RooArgList* point = (RooArgList*) _pointlist[i];
     _cutofflist.push_back(point);
   }
+  return 1;
 }
+
+TGraph RooMinuitMCMC::getCornerPlot(const char* name1, const char* name2, Bool_t cutoff)
+{
+  if (_pointlist.size() == 0) {
+    std::cout << "point list empty. Please run mcmc() first" << std::endl;
+  }
+  std::cout << "start drawing corner plot" << std::endl;
+  unsigned int index1 = 0;
+  unsigned int index2 = 1;
+  for (int i = 0; i < _nPar; i++) {
+    RooArgList* point = (RooArgList*) _pointlist[0];
+    RooRealVar* var1 = (RooRealVar*) point->at(i);
+    const char* varname = var1->GetName();
+    std::cout << (int*) varname << std::endl;
+    if (strcmp(name1, varname) == 0) {
+      index1 = i;
+    }
+    if (strcmp(name2, varname) == 0) {
+      index2 = i;
+    }
+  }
+
+  if (cutoff) {
+    unsigned int np = _cutofflist.size();
+    TVectorD x(np);
+    TVectorD y(np);
+
+    for (unsigned int i = 0; i < np; i++) {
+      RooArgList* point = (RooArgList*) _cutofflist[i];
+      RooRealVar* var1 = (RooRealVar*) point->at(index1);
+      RooRealVar* var2 = (RooRealVar*) point->at(index2);
+      x[i] = var1->getVal();
+      y[i] = var2->getVal();
+    }
+    TGraph *gr = new TGraph(x,y);
+
+    return *gr;
+  } else {
+    unsigned int np = _pointlist.size();
+    TVectorD x(np);
+    TVectorD y(np);
+
+    for (unsigned int i = 0; i < np; i++) {
+      RooArgList* point = (RooArgList*) _pointlist[i];
+      RooRealVar* var1 = (RooRealVar*) point->at(index1);
+      RooRealVar* var2 = (RooRealVar*) point->at(index2);
+      x[i] = var1->getVal();
+      y[i] = var2->getVal();
+    }
+    TGraph *gr = new TGraph(x,y);
+
+    return *gr;
+  }
+
+
+
+
+
+
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 /// Change MINUIT strategy to istrat. Accepted codes
 /// are 0,1,2 and represent MINUIT strategies for dealing

@@ -54,9 +54,9 @@ public:
 //  RooFitResult* fit(const char* options) ;
 
   Int_t mcmc(Int_t npoints, Int_t cutoff);
-  Int_t mcmc_func_val();
   TGraph getProfile(const char* name, Bool_t cutoff = kTRUE);
   TGraph getStepProfile(const char* name, Bool_t cutoff = kTRUE);
+  TGraph getCornerPlot(const char* name1, const char* name2, Bool_t cutoff);
   Int_t changeCutoff(Int_t newCutoff);
   // Int_t migrad() ;
   // Int_t hesse() ;

@@ -8,7 +8,7 @@ Likehood fit for CERN
 #include <stdlib.h>
 #include <TRandom3.h>
 #include <TH3F.h>
-#include <TH2F.h>
+#include <TH2.h>
 #include <TCanvas.h>
 #include <TApplication.h>
 #include "TMath.h"
@@ -40,80 +40,8 @@ using namespace std;
 #include "RooFitResult.h"
 #include "TH1.h"
 #include "TMultiGraph.h"
+#include "TStyle.h"
 using namespace RooFit ;
-
-double f_gllh(double mu, double sigma, TVectorD gauss_points)
-  {
-    double calc = 0;
-    for (int i = 0; i < gauss_points.GetNrows(); i++) {
-      calc += log(TMath::Gaus(gauss_points[i],mu,sigma,true));
-    }
-
-    return -calc;
-  }
-
-
-void rf101_basics() {
-  // S e t u p   m o d e l
-  // ---------------------
-
-  // Declare variables x,mean,sigma with associated name, title, initial value and allowed range
-  RooRealVar x("x","x",-10,10) ;
-  RooRealVar mean("mean","mean of gaussian",1,-10,10) ;
-  RooRealVar sigma("sigma","width of gaussian",1,0.1,10) ;
-
-  // Build gaussian p.d.f in terms of x,mean and sigma
-  RooGaussian gauss("gauss","gaussian PDF",x,mean,sigma) ;
-
-  // Construct plot frame in 'x'
-  RooPlot* xframe = x.frame(Title("Gaussian p.d.f.")) ;
-
-
-  // P l o t   m o d e l   a n d   c h a n g e   p a r a m e t e r   v a l u e s
-  // ---------------------------------------------------------------------------
-
-  // Plot gauss in frame (i.e. in x)
-  gauss.plotOn(xframe) ;
-
-  // Change the value of sigma to 3
-  sigma.setVal(3) ;
-
-  // Plot gauss in frame (i.e. in x) and draw frame on canvas
-  gauss.plotOn(xframe,LineColor(kRed)) ;
-
-
-  // G e n e r a t e   e v e n t s
-  // -----------------------------
-
-  // Generate a dataset of 1000 events in x from gauss
-  RooDataSet* data = gauss.generate(x,10000) ;
-
-  // Make a second plot frame in x and draw both the
-  // data and the p.d.f in the frame
-  RooPlot* xframe2 = x.frame(Title("Gaussian p.d.f. with data")) ;
-  data->plotOn(xframe2) ;
-  gauss.plotOn(xframe2) ;
-
-
-  // F i t   m o d e l   t o   d a t a
-  // -----------------------------
-
-  // Fit pdf to data
-  gauss.fitTo(*data) ;
-
-  // Print values of mean and sigma (that now reflect fitted values and errors)
-  mean.Print() ;
-  sigma.Print() ;
-
-  // Draw all frames on a canvas
-  TCanvas* c = new TCanvas("rf101_basics","rf101_basics",800,400) ;
-  c->Divide(2) ;
-  c->cd(1) ; gPad->SetLeftMargin(0.15) ; xframe->GetYaxis()->SetTitleOffset(1.6) ; xframe->Draw() ;
-  c->cd(2) ; gPad->SetLeftMargin(0.15) ; xframe2->GetYaxis()->SetTitleOffset(1.6) ; xframe2->Draw() ;
-
-
-}
-
 
 
 int main(int argc, char **argv) {
@@ -125,8 +53,8 @@ TApplication theApp("demoApplication",&argc,argv);
 //create a canvas
 
 TCanvas c1("c1","c1",1,1,1920,1080);
-TCanvas c2("c2","c2",1,1,1920,1080);
-TCanvas c3("c3","c3",1,1,1920,1080);
+// TCanvas c2("c2","c2",1,1,1920,1080);
+// TCanvas c3("c3","c3",1,1,1920,1080);
 
 TRandom3 *rnd = new TRandom3(35);
 
@@ -171,6 +99,7 @@ RooDataSet data("data", "data",RooArgSet(x));
   mi.hesse();
 
 m.mcmc(1000,200);
+m.saveCandidates("candidates.txt");
 
 
 
@@ -203,15 +132,15 @@ m.mcmc(1000,200);
 // walkDis.Draw();
 // c2.SaveAs("mustepprofile.png");
 
-TGraph walkDis = m.getWalkDis("sigma",kTRUE);
-c2.cd();
-walkDis.SetTitle("walk distribution of sigma with cutoff");
-walkDis.GetXaxis()->SetTitle("number of steps");
-walkDis.GetYaxis()->SetTitle("sigma value");
-walkDis.Draw();
-c2.SaveAs("sigmaWalkDis.png");
+// TGraph walkDis = m.getWalkDis("sigma",kTRUE);
+// c2.cd();
+// walkDis.SetTitle("walk distribution of sigma with cutoff");
+// walkDis.GetXaxis()->SetTitle("number of steps");
+// walkDis.GetYaxis()->SetTitle("sigma value");
+// walkDis.Draw();
+// c2.SaveAs("sigmaWalkDis.png");
 
-// TGraph corner = m.getCornerPlot("mean","sigma",kTRUE);
+// TH2D corner = m.getCornerPlot("mean","sigma",100, 2.8, 3.2, 100, 1.43, 1.65,kTRUE);
 // corner.SetTitle("Corner Plot");
 // corner.GetXaxis()->SetTitle("mean");
 // corner.GetYaxis()->SetTitle("sigma");
@@ -219,10 +148,45 @@ c2.SaveAs("sigmaWalkDis.png");
 // corner.Draw("A*");
 // c3.SaveAs("cornerplot.png");
 
-TH1F WalkDisHis = m.getWalkDisHis("sigma", 100, 1.43, 1.65,kTRUE);
-c1.cd();
-WalkDisHis.Draw();
-c1.SaveAs("sigmaWalkDisHis.png");
+
+//creating nice corner plot
+
+  TH1F *WalkDisHisMu = m.getWalkDisHis("mean", 100, 2.8, 3.2,kTRUE);
+  TH1F *WalkDisHisSig = m.getWalkDisHis("sigma", 100, 1.43, 1.65,kTRUE);
+  TH2D *corner = m.getCornerPlot("mean","sigma",100, 2.8, 3.2, 100, 1.43, 1.65,kTRUE);
+  gStyle->SetOptStat(0);
+  c1.cd();
+
+  TPad *pad1 = new TPad("pad1","This is pad1",0.05,0.52,0.95,0.97);
+  TPad *pad2 = new TPad("pad2","This is pad2",0.05,0.02,0.95,0.47);
+  pad1->SetFillColor(0);
+  pad2->SetFillColor(0);
+  pad1->Draw();
+  pad2->Draw();
+
+  pad1->cd();
+  TPad *pad11 = new TPad("pad11","First subpad of pad1",0.02,0.05,0.48,0.95,17,3);
+  TPad *pad12 = new TPad("pad12","Second subpad of pad1",0.52,0.05,0.98,0.95,17,3);
+  pad11->SetFillColor(0);
+  pad12->SetFillColor(0);
+  pad11->Draw();
+  pad12->Draw();
+
+  pad2->cd();
+  TPad *pad21 = new TPad("pad21","First subpad of pad2",0.02,0.05,0.48,0.95,17,3);
+  TPad *pad22 = new TPad("pad22","Second subpad of pad2",0.52,0.05,0.98,0.95,17,3);
+  pad21->SetFillColor(0);
+  pad22->SetFillColor(0);
+  pad21->Draw();
+  pad22->Draw();
+
+  pad11->cd();
+  WalkDisHisMu->Draw();
+  pad21->cd();
+  corner->SetMarkerStyle(7);
+  corner->Draw();
+  pad22->cd();
+  WalkDisHisSig->Draw();
 
 
 //m.printError("mean",0.68);

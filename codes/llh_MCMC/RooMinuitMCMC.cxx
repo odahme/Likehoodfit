@@ -44,10 +44,10 @@
 //
 // #include "TClass.h"
 //
-// #include <fstream>
+#include <fstream>
 //#include <iomanip>
 #include "TH1.h"
-//#include "TH2.h"
+#include "TH2.h"
 #include "TMarker.h"
 #include "TGraph.h"
 //#include "TStopwatch.h"
@@ -478,15 +478,19 @@ TGraph RooMinuitMCMC::getWalkDis(const char* name, Bool_t cutoff)
 
 }
 
-TH1F RooMinuitMCMC::getWalkDisHis(const char* name,  Int_t nbinsx, Double_t xlow, Double_t xup, Bool_t cutoff)
+TH1F* RooMinuitMCMC::getWalkDisHis(const char* name,  Int_t nbinsx, Double_t xlow, Double_t xup, Bool_t cutoff)
 {
   if (_pointList.size() == 0) {
     std::cout << "point list empty. Please run mcmc() first" << std::endl;
   }
 
+  string histNameStr = "Histogram of ";
+  histNameStr += name;
+  const char * histNameChar = histNameStr.c_str();
+
   Int_t index = getIndex(name);
 
-  TH1F * hist = new TH1F(name, name, nbinsx, xlow, xup);
+  TH1F *hist = new TH1F(histNameChar, histNameChar, nbinsx, xlow, xup);
 
   if (cutoff) {
     unsigned int np = _cutoffList.size();
@@ -496,7 +500,7 @@ TH1F RooMinuitMCMC::getWalkDisHis(const char* name,  Int_t nbinsx, Double_t xlow
       RooRealVar* var1 = (RooRealVar*) point->at(index);
       hist->Fill(var1->getVal());
     }
-    return *hist;
+    return hist;
   } else {
     unsigned int np = _pointList.size();
 
@@ -505,7 +509,7 @@ TH1F RooMinuitMCMC::getWalkDisHis(const char* name,  Int_t nbinsx, Double_t xlow
       RooRealVar* var1 = (RooRealVar*) point->at(index);
       hist->Fill(var1->getVal());
     }
-    return *hist;
+    return hist;
   }
 
 
@@ -523,8 +527,13 @@ Int_t RooMinuitMCMC::changeCutoff(Int_t newCutoff)
   return 1;
 }
 
-TGraph RooMinuitMCMC::getCornerPlot(const char* name1, const char* name2, Bool_t cutoff)
+TH2D* RooMinuitMCMC::getCornerPlot(const char* name1, const char* name2, Int_t nbinsx, Double_t xlow, Double_t xup, Int_t nbinsy, Double_t ylow, Double_t yup, Bool_t cutoff)
 {
+  string histNameStr = "Corner Plot of ";
+  histNameStr += name1;
+  histNameStr += " and ";
+  histNameStr += name2;
+  const char * histNameChar = histNameStr.c_str();
   if (_pointList.size() == 0) {
     std::cout << "point list empty. Please run mcmc() first" << std::endl;
   }
@@ -542,36 +551,40 @@ TGraph RooMinuitMCMC::getCornerPlot(const char* name1, const char* name2, Bool_t
     }
   }
 
+  TH2D *hist = new TH2D(histNameChar,histNameChar,nbinsx,xlow,xup,nbinsy,ylow,yup);
+
   if (cutoff) {
     unsigned int np = _cutoffList.size();
-    TVectorD x(np);
-    TVectorD y(np);
+    Double_t x = 0;
+    Double_t y = 0;
 
     for (unsigned int i = 0; i < np; i++) {
       RooArgList* point = (RooArgList*) _cutoffList[i];
       RooRealVar* var1 = (RooRealVar*) point->at(index1);
       RooRealVar* var2 = (RooRealVar*) point->at(index2);
-      x[i] = var1->getVal();
-      y[i] = var2->getVal();
+      x = var1->getVal();
+      y = var2->getVal();
+      hist->Fill(x,y);
     }
-    TGraph *gr = new TGraph(x,y);
 
-    return *gr;
+
+    return hist;
   } else {
     unsigned int np = _pointList.size();
-    TVectorD x(np);
-    TVectorD y(np);
+    Double_t x = 0;
+    Double_t y = 0;
 
     for (unsigned int i = 0; i < np; i++) {
       RooArgList* point = (RooArgList*) _pointList[i];
       RooRealVar* var1 = (RooRealVar*) point->at(index1);
       RooRealVar* var2 = (RooRealVar*) point->at(index2);
-      x[i] = var1->getVal();
-      y[i] = var2->getVal();
+      x = var1->getVal();
+      y= var2->getVal();
+      hist->Fill(x,y);
     }
-    TGraph *gr = new TGraph(x,y);
 
-    return *gr;
+
+    return hist;
   }
 }
 
@@ -633,7 +646,28 @@ Int_t RooMinuitMCMC::printError(const char* name, Double_t conf)
 
 }
 
+Int_t RooMinuitMCMC::saveCandidates(const char* name)
+{
+  ofstream candidates;
+  candidates.open(name);
+  for (Int_t i = 0; i < _nPar; i++) {
+    RooArgList* point = (RooArgList*) _pointList[0];
+    RooRealVar* var = (RooRealVar*) point->at(i);
+    candidates << var->GetName() << "\t";
+  }
+  candidates << "\n";
 
+  for (size_t i = 0; i < _pointList.size(); i++) {
+    RooArgList* point = (RooArgList*) _pointList[i];
+    for (Int_t j = 0; j < _nPar; j++) {
+      RooRealVar* var = (RooRealVar*) point->at(j);
+      candidates << var->getVal() << "\t";
+    }
+    candidates << "\n";
+  }
+  candidates.close();
+  return 1;
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 /// Change MINUIT strategy to istrat. Accepted codes

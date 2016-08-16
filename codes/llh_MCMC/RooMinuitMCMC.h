@@ -31,7 +31,7 @@ class RooArgList ;
 //class RooArgSet ;
 class RooAbsArg ;
 class TVirtualFitter ;
-//class TH2F ;
+class TH2F ;
 class RooPlot ;
 
 //void RooMinuitMCMCGlue(Int_t& /*np*/, Double_t* /*gin*/,  Double_t &f, Double_t *par, Int_t /*flag*/) ;
@@ -56,10 +56,11 @@ public:
   Int_t mcmc(Int_t npoints, Int_t cutoff);
   TGraph getProfile(const char* name, Bool_t cutoff = kTRUE);
   TGraph getWalkDis(const char* name, Bool_t cutoff = kTRUE);
-  TH1F   getWalkDisHis(const char* name,  Int_t nbinsx, Double_t xlow, Double_t xup, Bool_t cutoff);
-  TGraph getCornerPlot(const char* name1, const char* name2, Bool_t cutoff);
+  TH1F*   getWalkDisHis(const char* name,  Int_t nbinsx, Double_t xlow, Double_t xup, Bool_t cutoff);
+  TH2D*   getCornerPlot(const char* name1, const char* name2, Int_t nbinsx, Double_t xlow, Double_t xup,  Int_t nbinsy, Double_t ylow, Double_t yup, Bool_t cutoff);
   Int_t changeCutoff(Int_t newCutoff);
   Int_t printError(const char* name, Double_t conf);
+  Int_t saveCandidates(const char* name);
   // Int_t migrad() ;
   // Int_t hesse() ;
 //  Int_t minos() ;

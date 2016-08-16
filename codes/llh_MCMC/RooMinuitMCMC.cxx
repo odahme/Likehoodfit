@@ -229,16 +229,17 @@ Int_t RooMinuitMCMC::mcmc(Int_t npoints, Int_t cutoff)
   double maxstep = 0.01; //maximum step size
   double alphastar = 0.234; //forced acceptance rate
   _cutoff = cutoff;
-  _pointlist.reserve(npoints);
-  _cutofflist.reserve(npoints - cutoff);
+  _pointList.reserve(npoints);
+  _cutoffList.reserve(npoints - cutoff);
 
 
   Bool_t accepted;
   unsigned int ntested = 0;
-  unsigned int naccepted = 0;
+  Int_t naccepted = 0;
 
   RooArgList* last = (RooArgList*) _floatParamList->snapshot(kTRUE);
   RooArgList* curr = (RooArgList*) _floatParamList->snapshot(kTRUE);
+  RooArgList* best = (RooArgList*) _floatParamList->snapshot(kTRUE);
   RooRealVar* nllval = new RooRealVar("nllval","nllval of parameters",-1);
 
   double minllh = 1e32;
@@ -305,13 +306,13 @@ Int_t RooMinuitMCMC::mcmc(Int_t npoints, Int_t cutoff)
 
 
     if (llh_curr < minllh) {
-      minllh = llh_curr;
+      best = (RooArgList*) curr->snapshot(kTRUE);
     }
 
     double alpha = std::min(1.0, exp(llh_last - llh_curr));
     double r = rnd->Uniform(0,1);
     accepted = false;
-    double acceptrate = double(naccepted)/double(ntested);
+    //double acceptrate = double(naccepted)/double(ntested);
 
     if (r < alpha) {
       //success
@@ -319,7 +320,7 @@ Int_t RooMinuitMCMC::mcmc(Int_t npoints, Int_t cutoff)
       nllval->setVal(llh_curr);
       RooArgList* point = (RooArgList*) curr->snapshot(kTRUE);
       point->addClone(*nllval);
-      _pointlist.push_back(point);
+      _pointList.push_back(point);
       naccepted++;
 
       last = (RooArgList*) curr->snapshot(kTRUE);
@@ -330,7 +331,7 @@ Int_t RooMinuitMCMC::mcmc(Int_t npoints, Int_t cutoff)
     }
 
     lastaccepted.insert(lastaccepted.begin(), accepted);
-    double lastratio = 0.0;
+    //double lastratio = 0.0;
     if (lastaccepted.size() > nlast)
     {
     //lastaccepted.push_back(accepted);
@@ -338,7 +339,7 @@ Int_t RooMinuitMCMC::mcmc(Int_t npoints, Int_t cutoff)
     for (unsigned int j=0; j<lastaccepted.size(); j++)
     if (lastaccepted.at(j))
       nlastaccepted++;
-    lastratio = double(nlastaccepted)/double(lastaccepted.size());
+    //lastratio = double(nlastaccepted)/double(lastaccepted.size());
     lastaccepted.pop_back();
     }
 
@@ -382,15 +383,15 @@ Int_t RooMinuitMCMC::mcmc(Int_t npoints, Int_t cutoff)
     }
   }
 
-  for (size_t i = cutoff; i < _pointlist.size(); i++) {
-    RooArgList* point = (RooArgList*) _pointlist[i];
-    _cutofflist.push_back(point);
+  for (size_t i = cutoff; i < _pointList.size(); i++) {
+    RooArgList* point = (RooArgList*) _pointList[i];
+    _cutoffList.push_back(point);
   }
 
-
-  // std::cout << ntested << " points were tested" << std::endl;
-  // std::cout << naccepted << " points were accepted" << std::endl;
-  // std::cout << "The accept fraction is " << double(naccepted)/double(ntested) << std::endl;
+  _bestParamList = (RooArgList*) best->snapshot(kTRUE);
+  std::cout << ntested << " points were tested" << std::endl;
+  std::cout << naccepted << " points were accepted" << std::endl;
+  std::cout << "The accept fraction is " << double(naccepted)/double(ntested) << std::endl;
 
   return 1;
 }
@@ -398,29 +399,19 @@ Int_t RooMinuitMCMC::mcmc(Int_t npoints, Int_t cutoff)
 
 TGraph RooMinuitMCMC::getProfile(const char* name, Bool_t cutoff)
 {
-  if (_pointlist.size() == 0) {
+  if (_pointList.size() == 0) {
     std::cout << "point list empty. Please run mcmc() first" << std::endl;
   }
 
-  unsigned int index = 0;
-  for (int i = 0; i < _nPar; i++) {
-    RooArgList* point = (RooArgList*) _pointlist[0];
-    RooRealVar* var1 = (RooRealVar*) point->at(i);
-    const char* varname = var1->GetName();
-    std::cout << (int*) varname << std::endl;
-    if (strcmp(name, varname) == 0) {
-      index = i;
-      break;
-    }
-  }
+  unsigned int index = getIndex(name);
 
   if (cutoff) {
-    unsigned int np = _cutofflist.size();
+    unsigned int np = _cutoffList.size();
     TVectorD x(np);
     TVectorD y(np);
 
     for (unsigned int i = 0; i < np; i++) {
-      RooArgList* point = (RooArgList*) _cutofflist[i];
+      RooArgList* point = (RooArgList*) _cutoffList[i];
       RooRealVar* var1 = (RooRealVar*) point->at(index);
       RooRealVar* var2 = (RooRealVar*) point->at(_nPar);
       x[i] = var1->getVal();
@@ -430,12 +421,12 @@ TGraph RooMinuitMCMC::getProfile(const char* name, Bool_t cutoff)
 
     return *gr;
   } else {
-    unsigned int np = _pointlist.size();
+    unsigned int np = _pointList.size();
     TVectorD x(np);
     TVectorD y(np);
 
     for (unsigned int i = 0; i < np; i++) {
-      RooArgList* point = (RooArgList*) _pointlist[i];
+      RooArgList* point = (RooArgList*) _pointList[i];
       RooRealVar* var1 = (RooRealVar*) point->at(index);
       RooRealVar* var2 = (RooRealVar*) point->at(_nPar);
       x[i] = var1->getVal();
@@ -448,31 +439,21 @@ TGraph RooMinuitMCMC::getProfile(const char* name, Bool_t cutoff)
 
 }
 
-TGraph RooMinuitMCMC::getStepProfile(const char* name, Bool_t cutoff)
+TGraph RooMinuitMCMC::getWalkDis(const char* name, Bool_t cutoff)
 {
-  if (_pointlist.size() == 0) {
+  if (_pointList.size() == 0) {
     std::cout << "point list empty. Please run mcmc() first" << std::endl;
   }
 
-  unsigned int index = 0;
-  for (int i = 0; i < _nPar; i++) {
-    RooArgList* point = (RooArgList*) _pointlist[0];
-    RooRealVar* var1 = (RooRealVar*) point->at(i);
-    const char* varname = var1->GetName();
-    if (strcmp(name, varname) == 0) {
-      index = i;
-      std::cout << index << std::endl;
-      break;
-    }
-  }
+  Int_t index = getIndex(name);
 
   if (cutoff) {
-    unsigned int np = _cutofflist.size();
+    unsigned int np = _cutoffList.size();
     TVectorD x(np);
     TVectorD y(np);
 
     for (unsigned int i = 0; i < np; i++) {
-      RooArgList* point = (RooArgList*) _cutofflist[i];
+      RooArgList* point = (RooArgList*) _cutoffList[i];
       RooRealVar* var1 = (RooRealVar*) point->at(index);
       x[i] = _cutoff+i;
       y[i] = var1->getVal();
@@ -480,12 +461,12 @@ TGraph RooMinuitMCMC::getStepProfile(const char* name, Bool_t cutoff)
     TGraph *gr = new TGraph(x,y);
     return *gr;
   } else {
-    unsigned int np = _pointlist.size();
+    unsigned int np = _pointList.size();
     TVectorD x(np);
     TVectorD y(np);
 
     for (unsigned int i = 0; i < np; i++) {
-      RooArgList* point = (RooArgList*) _pointlist[i];
+      RooArgList* point = (RooArgList*) _pointList[i];
       RooRealVar* var1 = (RooRealVar*) point->at(index);
       x[i] = i;
       y[i] = var1->getVal();
@@ -497,31 +478,62 @@ TGraph RooMinuitMCMC::getStepProfile(const char* name, Bool_t cutoff)
 
 }
 
+TH1F RooMinuitMCMC::getWalkDisHis(const char* name,  Int_t nbinsx, Double_t xlow, Double_t xup, Bool_t cutoff)
+{
+  if (_pointList.size() == 0) {
+    std::cout << "point list empty. Please run mcmc() first" << std::endl;
+  }
+
+  Int_t index = getIndex(name);
+
+  TH1F * hist = new TH1F(name, name, nbinsx, xlow, xup);
+
+  if (cutoff) {
+    unsigned int np = _cutoffList.size();
+
+    for (unsigned int i = 0; i < np; i++) {
+      RooArgList* point = (RooArgList*) _cutoffList[i];
+      RooRealVar* var1 = (RooRealVar*) point->at(index);
+      hist->Fill(var1->getVal());
+    }
+    return *hist;
+  } else {
+    unsigned int np = _pointList.size();
+
+    for (unsigned int i = 0; i < np; i++) {
+      RooArgList* point = (RooArgList*) _pointList[i];
+      RooRealVar* var1 = (RooRealVar*) point->at(index);
+      hist->Fill(var1->getVal());
+    }
+    return *hist;
+  }
+
+
+}
+
 Int_t RooMinuitMCMC::changeCutoff(Int_t newCutoff)
 {
   _cutoff = newCutoff;
-  _cutofflist.clear();
-  _cutofflist.reserve(_pointlist.size() - newCutoff);
-  for (size_t i = newCutoff; i < _pointlist.size(); i++) {
-    RooArgList* point = (RooArgList*) _pointlist[i];
-    _cutofflist.push_back(point);
+  _cutoffList.clear();
+  _cutoffList.reserve(_pointList.size() - newCutoff);
+  for (size_t i = newCutoff; i < _pointList.size(); i++) {
+    RooArgList* point = (RooArgList*) _pointList[i];
+    _cutoffList.push_back(point);
   }
   return 1;
 }
 
 TGraph RooMinuitMCMC::getCornerPlot(const char* name1, const char* name2, Bool_t cutoff)
 {
-  if (_pointlist.size() == 0) {
+  if (_pointList.size() == 0) {
     std::cout << "point list empty. Please run mcmc() first" << std::endl;
   }
-  std::cout << "start drawing corner plot" << std::endl;
-  unsigned int index1 = 0;
-  unsigned int index2 = 1;
-  for (int i = 0; i < _nPar; i++) {
-    RooArgList* point = (RooArgList*) _pointlist[0];
+  Int_t index1 = getIndex(name1);
+  Int_t index2 = getIndex(name2);
+    for (int i = 0; i < _nPar; i++) {
+    RooArgList* point = (RooArgList*) _pointList[0];
     RooRealVar* var1 = (RooRealVar*) point->at(i);
     const char* varname = var1->GetName();
-    std::cout << (int*) varname << std::endl;
     if (strcmp(name1, varname) == 0) {
       index1 = i;
     }
@@ -531,12 +543,12 @@ TGraph RooMinuitMCMC::getCornerPlot(const char* name1, const char* name2, Bool_t
   }
 
   if (cutoff) {
-    unsigned int np = _cutofflist.size();
+    unsigned int np = _cutoffList.size();
     TVectorD x(np);
     TVectorD y(np);
 
     for (unsigned int i = 0; i < np; i++) {
-      RooArgList* point = (RooArgList*) _cutofflist[i];
+      RooArgList* point = (RooArgList*) _cutoffList[i];
       RooRealVar* var1 = (RooRealVar*) point->at(index1);
       RooRealVar* var2 = (RooRealVar*) point->at(index2);
       x[i] = var1->getVal();
@@ -546,12 +558,12 @@ TGraph RooMinuitMCMC::getCornerPlot(const char* name1, const char* name2, Bool_t
 
     return *gr;
   } else {
-    unsigned int np = _pointlist.size();
+    unsigned int np = _pointList.size();
     TVectorD x(np);
     TVectorD y(np);
 
     for (unsigned int i = 0; i < np; i++) {
-      RooArgList* point = (RooArgList*) _pointlist[i];
+      RooArgList* point = (RooArgList*) _pointList[i];
       RooRealVar* var1 = (RooRealVar*) point->at(index1);
       RooRealVar* var2 = (RooRealVar*) point->at(index2);
       x[i] = var1->getVal();
@@ -561,13 +573,67 @@ TGraph RooMinuitMCMC::getCornerPlot(const char* name1, const char* name2, Bool_t
 
     return *gr;
   }
+}
 
+void RooMinuitMCMC::sortPointList()
+{
+  int index = _nPar;
+  _sortPointList.clear();
+  _sortPointList.reserve(_cutoffList.size());
+  for (size_t i = 0; i < _cutoffList.size(); i++) {
+    RooArgList* point = (RooArgList*) _cutoffList[i];
+    _sortPointList.push_back(point);
+  }
+  std::sort(_sortPointList.begin(),_sortPointList.end(), [&index](RooArgList* a, RooArgList* b){
+    RooRealVar* var1 = (RooRealVar*) a->at(index);
+    RooRealVar* var2 = (RooRealVar*) b->at(index);
+    if (var1->getVal() < var2->getVal()) {
+      return kTRUE;
+    }else{
+      return kFALSE;
+    }
+  });
+}
 
+Int_t RooMinuitMCMC::getIndex(const char* name)
+{
+  Int_t index = 0;
+  for (int i = 0; i < _nPar; i++) {
+    RooArgList* point = (RooArgList*) _pointList[0];
+    RooRealVar* var1 = (RooRealVar*) point->at(i);
+    const char* varname = var1->GetName();
+    if (strcmp(name, varname) == 0) {
+      index = i;
+      break;
+    }
+  }
+  return index;
+}
 
+Int_t RooMinuitMCMC::printError(const char* name, Double_t conf)
+{
+  sortPointList();
+  Int_t count = int(_sortPointList.size() * conf) ;
+  Double_t high = -1e32;
+  Double_t low = 1e32;
+  Int_t index = getIndex(name);
 
-
+  for (Int_t i = 0; i < count; i++) {
+    RooArgList* point = (RooArgList*) _sortPointList[i];
+    RooRealVar* var = (RooRealVar*) point->at(index);
+    if (var->getVal() < low) {
+      low = var->getVal();
+    }
+    if (var->getVal() > high) {
+      high = var->getVal();
+    }
+  }
+  std::cout << "error = "<< high - low << std::endl;
+  return 1;
 
 }
+
+
 
 ////////////////////////////////////////////////////////////////////////////////
 /// Change MINUIT strategy to istrat. Accepted codes

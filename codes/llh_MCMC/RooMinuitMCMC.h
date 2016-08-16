@@ -55,9 +55,11 @@ public:
 
   Int_t mcmc(Int_t npoints, Int_t cutoff);
   TGraph getProfile(const char* name, Bool_t cutoff = kTRUE);
-  TGraph getStepProfile(const char* name, Bool_t cutoff = kTRUE);
+  TGraph getWalkDis(const char* name, Bool_t cutoff = kTRUE);
+  TH1F   getWalkDisHis(const char* name,  Int_t nbinsx, Double_t xlow, Double_t xup, Bool_t cutoff);
   TGraph getCornerPlot(const char* name1, const char* name2, Bool_t cutoff);
   Int_t changeCutoff(Int_t newCutoff);
+  Int_t printError(const char* name, Double_t conf);
   // Int_t migrad() ;
   // Int_t hesse() ;
 //  Int_t minos() ;
@@ -108,10 +110,13 @@ public:
 //   void setPdfParamErr(Int_t index, Double_t value) ;
 //   void setPdfParamErr(Int_t index, Double_t loVal, Double_t hiVal) ;
 //   void clearPdfParamAsymErr(Int_t index) ;
+
 //
 //   void saveStatus(const char* label, Int_t status) { _statusHistory.push_back(std::pair<std::string,int>(label,status)) ; }
 //
-   void updateFloatVec() ;
+     void updateFloatVec() ;
+     void sortPointList() ;
+     Int_t getIndex(const char* name) ;
 //
  private:
 //
@@ -133,9 +138,11 @@ public:
    RooArgList* _initFloatParamList ;
    RooArgList* _constParamList ;
    RooArgList* _initConstParamList ;
+   RooArgList*  _bestParamList;
    RooAbsReal* _func ;
-   std::vector<RooArgList*> _pointlist;
-   std::vector<RooArgList*> _cutofflist;
+   std::vector<RooArgList*> _pointList;
+   std::vector<RooArgList*> _cutoffList;
+   std::vector<RooArgList*> _sortPointList;
 //
 //   Double_t    _maxFCN ;
 //   std::ofstream*   _logfile ;

@@ -36,6 +36,7 @@ using namespace std;
 #include "RooProdPdf.h"
 #include "RooAddPdf.h"
 #include "RooMinuitMCMC.h"
+#include "RooMinuit.h"
 #include "RooFitResult.h"
 #include "TH1.h"
 #include "TMultiGraph.h"
@@ -125,7 +126,7 @@ TApplication theApp("demoApplication",&argc,argv);
 
 TCanvas c1("c1","c1",1,1,1920,1080);
 TCanvas c2("c2","c2",1,1,1920,1080);
-//TCanvas c3("c3","c3",1,1,1024,768);
+TCanvas c3("c3","c3",1,1,1920,1080);
 
 TRandom3 *rnd = new TRandom3(35);
 
@@ -165,12 +166,15 @@ RooDataSet data("data", "data",RooArgSet(x));
 // Create MINUIT interface object
   RooMinuitMCMC m(*nll) ;
 
-m.mcmc(10000,0);
+  RooMinuit mi(*nll);
+  mi.minos();
+  mi.hesse();
+
+m.mcmc(1000,200);
 
 
-TGraph muprofile = m.getProfile("mean",kTRUE);
-m.changeCutoff(200);
-TGraph stepProfil = m.getStepProfile("mean",kTRUE);
+
+
 //data.Print("v");
 //cout << endl ;
 //gauss.fitTo(data);
@@ -183,23 +187,45 @@ TGraph stepProfil = m.getStepProfile("mean",kTRUE);
 //xframe->SetAxisRange(-10,10);
 
 //root fit stuff end
-//c1.cd();
-//muprofile.SetTitle("MCMC");
-//muprofile.GetXaxis()->SetTitle("mean value");
-//muprofile.GetYaxis()->SetTitle("nll value");
-//muprofile.Draw();
-//c1.SaveAs("muprofile.png");
+// TGraph muprofile = m.getProfile("mean",kTRUE);
+// c1.cd();
+// muprofile.SetTitle("MCMC");
+// muprofile.GetXaxis()->SetTitle("mean value");
+// muprofile.GetYaxis()->SetTitle("nll value");
+// muprofile.Draw();
+// c1.SaveAs("muprofile.png");
 
+// TGraph walkDis = m.getWalkDis("mean",kTRUE);
 // c2.cd();
-// stepProfil.SetTitle("walk distribution of mean with cutoff");
-// stepProfil.GetXaxis()->SetTitle("number of steps");
-// stepProfil.GetYaxis()->SetTitle("mean value");
-// stepProfil.Draw();
+// walkDis.SetTitle("walk distribution of mean with cutoff");
+// walkDis.GetXaxis()->SetTitle("number of steps");
+// walkDis.GetYaxis()->SetTitle("mean value");
+// walkDis.Draw();
 // c2.SaveAs("mustepprofile.png");
 
-TGraph corner = m.getCornerPlot("mean","sigma",kTRUE);
+TGraph walkDis = m.getWalkDis("sigma",kTRUE);
+c2.cd();
+walkDis.SetTitle("walk distribution of sigma with cutoff");
+walkDis.GetXaxis()->SetTitle("number of steps");
+walkDis.GetYaxis()->SetTitle("sigma value");
+walkDis.Draw();
+c2.SaveAs("sigmaWalkDis.png");
+
+// TGraph corner = m.getCornerPlot("mean","sigma",kTRUE);
+// corner.SetTitle("Corner Plot");
+// corner.GetXaxis()->SetTitle("mean");
+// corner.GetYaxis()->SetTitle("sigma");
+// c3.cd();
+// corner.Draw("A*");
+// c3.SaveAs("cornerplot.png");
+
+TH1F WalkDisHis = m.getWalkDisHis("sigma", 100, 1.43, 1.65,kTRUE);
 c1.cd();
-corner.Draw("A*");
+WalkDisHis.Draw();
+c1.SaveAs("sigmaWalkDisHis.png");
+
+
+//m.printError("mean",0.68);
 
 
 //turns off the program with mous clic

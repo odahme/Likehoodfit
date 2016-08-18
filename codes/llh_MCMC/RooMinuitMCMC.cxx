@@ -42,7 +42,7 @@
  #include "RooFit.h"
 // #include "Riostream.h"
 //
-// #include "TClass.h"
+ // #include "TClass.h"
 //
 #include <fstream>
 //#include <iomanip>
@@ -61,7 +61,7 @@
 #include "RooAbsReal.h"
 #include "RooAbsRealLValue.h"
 #include "RooRealVar.h"
-//#include "RooFitResult.h"
+#include "RooFitResult.h"
 //#include "RooAbsPdf.h"
 //#include "RooSentinel.h"
 //#include "RooMsgService.h"
@@ -69,11 +69,16 @@
 
 //new stuff
 #include <TVectorD.h>
+#include "TMatrixD.h"
 #include <TRandom3.h>
 #include "RooDataSet.h"
 #include "TDecompChol.h"
 #include <TCanvas.h>
 #include <iostream>
+#include "TStyle.h"
+#include "TMultiGraph.h"
+#include "TLine.h"
+
 
 
 
@@ -127,6 +132,7 @@ RooMinuitMCMC::RooMinuitMCMC(RooAbsReal& function)
   // _logfile = 0 ;
   // _optConst = kFALSE ;
   _verbose = kFALSE ;
+  _fileName = "out.root";
   // _profile = kFALSE ;
   // _handleLocalErrors = kTRUE ;
   // _printLevel = 1 ;
@@ -221,16 +227,24 @@ RooMinuitMCMC::~RooMinuitMCMC()
 }
 
 
-Int_t RooMinuitMCMC::mcmc(Int_t npoints, Int_t cutoff)
+Int_t RooMinuitMCMC::mcmc(Int_t npoints, Int_t cutoff, const char* errorstrategy)
 {
+
+  if (strcmp(errorstrategy, "gaus") == 0) {
+    _gaus = kTRUE;
+  }
+  if (strcmp(errorstrategy, "interval") == 0) {
+    _interval = kTRUE;
+  }
+
+
+
   TRandom3 *rnd = new TRandom3(35); //random generator with seed
   unsigned int nparams = _nPar; //number of parameters
-  unsigned int nstat = npoints*10;//number of tries
+  unsigned int nstat = npoints*100;//number of tries
   double maxstep = 0.01; //maximum step size
   double alphastar = 0.234; //forced acceptance rate
-  _cutoff = cutoff;
   _pointList.reserve(npoints);
-  _cutoffList.reserve(npoints - cutoff);
 
 
   Bool_t accepted;
@@ -241,6 +255,7 @@ Int_t RooMinuitMCMC::mcmc(Int_t npoints, Int_t cutoff)
   RooArgList* curr = (RooArgList*) _floatParamList->snapshot(kTRUE);
   RooArgList* best = (RooArgList*) _floatParamList->snapshot(kTRUE);
   RooRealVar* nllval = new RooRealVar("nllval","nllval of parameters",-1);
+
 
   double minllh = 1e32;
 
@@ -383,6 +398,8 @@ Int_t RooMinuitMCMC::mcmc(Int_t npoints, Int_t cutoff)
     }
   }
 
+  _cutoff = cutoff;
+  _cutoffList.reserve(npoints - cutoff);
   for (size_t i = cutoff; i < _pointList.size(); i++) {
     RooArgList* point = (RooArgList*) _pointList[i];
     _cutoffList.push_back(point);
@@ -392,24 +409,42 @@ Int_t RooMinuitMCMC::mcmc(Int_t npoints, Int_t cutoff)
   std::cout << ntested << " points were tested" << std::endl;
   std::cout << naccepted << " points were accepted" << std::endl;
   std::cout << "The accept fraction is " << double(naccepted)/double(ntested) << std::endl;
+  std::cout << "" << std::endl;
+  if (_gaus) {
+    getGausErrors();
+  }
+  if (_interval) {
+    for (size_t i = 0; i < nparams; i++) {
+      RooArgList* point = (RooArgList*) _cutoffList[0];
+      RooRealVar* var = (RooRealVar*) point->at(i);
+      const char* valname = var->GetName();
+      getPercentile(valname);
+    }
+  }
 
   return 1;
 }
 
 
-TGraph RooMinuitMCMC::getProfile(const char* name, Bool_t cutoff)
+TGraph* RooMinuitMCMC::getProfile(const char* name, Bool_t cutoff)
 {
   if (_pointList.size() == 0) {
     std::cout << "point list empty. Please run mcmc() first" << std::endl;
   }
+
+  unsigned int np =0;
+  if (cutoff) {
+    np = _cutoffList.size();
+  } else {
+    np = _pointList.size();
+  }
+
 
   unsigned int index = getIndex(name);
+  TVectorD x(np);
+  TVectorD y(np);
 
   if (cutoff) {
-    unsigned int np = _cutoffList.size();
-    TVectorD x(np);
-    TVectorD y(np);
-
     for (unsigned int i = 0; i < np; i++) {
       RooArgList* point = (RooArgList*) _cutoffList[i];
       RooRealVar* var1 = (RooRealVar*) point->at(index);
@@ -417,14 +452,8 @@ TGraph RooMinuitMCMC::getProfile(const char* name, Bool_t cutoff)
       x[i] = var1->getVal();
       y[i] = var2->getVal();
     }
-    TGraph *gr = new TGraph(x,y);
 
-    return *gr;
   } else {
-    unsigned int np = _pointList.size();
-    TVectorD x(np);
-    TVectorD y(np);
-
     for (unsigned int i = 0; i < np; i++) {
       RooArgList* point = (RooArgList*) _pointList[i];
       RooRealVar* var1 = (RooRealVar*) point->at(index);
@@ -432,65 +461,99 @@ TGraph RooMinuitMCMC::getProfile(const char* name, Bool_t cutoff)
       x[i] = var1->getVal();
       y[i] = var2->getVal();
     }
-    TGraph *gr = new TGraph(x,y);
-
-    return *gr;
   }
 
+  TGraph* gr = new TGraph(x,y);
+  gr->GetXaxis()->SetTitle(name);
+  gr->GetYaxis()->SetTitle("nll value");
+  return gr;
 }
 
-TGraph RooMinuitMCMC::getWalkDis(const char* name, Bool_t cutoff)
+TMultiGraph* RooMinuitMCMC::getWalkDis(const char* name, Bool_t cutoff)
 {
   if (_pointList.size() == 0) {
     std::cout << "point list empty. Please run mcmc() first" << std::endl;
   }
+
+  string graphTitelStr = "Walk Distribution of ";
+  graphTitelStr += name;
+  const char * graphTitelChar = graphTitelStr.c_str();
+  string graphNameStr = "Dis";
+  graphNameStr += name;
+  const char * graphNameChar = graphNameStr.c_str();
 
   Int_t index = getIndex(name);
+  TMultiGraph* graph = new TMultiGraph(graphNameChar,graphTitelChar);
+  size_t np = 0;
 
-  if (cutoff) {
-    unsigned int np = _cutoffList.size();
-    TVectorD x(np);
-    TVectorD y(np);
-
-    for (unsigned int i = 0; i < np; i++) {
-      RooArgList* point = (RooArgList*) _cutoffList[i];
-      RooRealVar* var1 = (RooRealVar*) point->at(index);
-      x[i] = _cutoff+i;
-      y[i] = var1->getVal();
-    }
-    TGraph *gr = new TGraph(x,y);
-    return *gr;
-  } else {
-    unsigned int np = _pointList.size();
-    TVectorD x(np);
-    TVectorD y(np);
+  if (cutoff == kFALSE) {
+    np = _cutoff;
+    TVectorD x1(np);
+    TVectorD y1(np);
 
     for (unsigned int i = 0; i < np; i++) {
-      RooArgList* point = (RooArgList*) _pointList[i];
-      RooRealVar* var1 = (RooRealVar*) point->at(index);
-      x[i] = i;
-      y[i] = var1->getVal();
+      RooArgList* point1 = (RooArgList*) _pointList[i];
+      RooRealVar* var1 = (RooRealVar*) point1->at(index);
+      x1[i] = i;
+      y1[i] = var1->getVal();
     }
-    TGraph *gr = new TGraph(x,y);
-    return *gr;
+    TGraph* gr1 = new TGraph(x1,y1);
+    gr1->SetLineColor(2);
+    graph->Add(gr1);
+
+    Double_t minVal = getMinList(name);
+    Double_t maxVal = getMaxList(name);
+    Double_t x[2] = {Double_t(_cutoff),Double_t(_cutoff)};
+    Double_t y[2] = {minVal,maxVal};
+    TGraph* cutline = new TGraph(2,x,y);
+    cutline->SetLineWidth(5);
+    cutline->SetLineStyle(2);
+    graph->Add(cutline);
   }
 
+  np = _cutoffList.size();
+  TVectorD x2(np);
+  TVectorD y2(np);
 
+  for (unsigned int i = 0; i < np; i++) {
+    RooArgList* point2 = (RooArgList*) _cutoffList[i];
+    RooRealVar* var2 = (RooRealVar*) point2->at(index);
+    x2[i] = _cutoff+i;
+    y2[i] = var2->getVal();
+  }
+  TGraph* gr2 = new TGraph(x2,y2);
+  if (cutoff == kFALSE) {
+    gr2->SetLineColor(4);
+  }
+  graph->Add(gr2);
+
+  graph->Draw("ap");
+  graph->GetXaxis()->SetTitle("number of steps");
+  graph->GetYaxis()->SetTitle(name);
+
+  return graph;
 }
 
-TH1F* RooMinuitMCMC::getWalkDisHis(const char* name,  Int_t nbinsx, Double_t xlow, Double_t xup, Bool_t cutoff)
+TH1F* RooMinuitMCMC::getWalkDisHis(const char* name,  Int_t nbinsx, Bool_t cutoff)
 {
   if (_pointList.size() == 0) {
     std::cout << "point list empty. Please run mcmc() first" << std::endl;
   }
 
-  string histNameStr = "Histogram of ";
+  Double_t xlow = getMinList(name);
+  Double_t xup = getMaxList(name);
+
+  string histTitelStr = "Histogram of ";
+  histTitelStr += name;
+  const char * histTitelChar = histTitelStr.c_str();
+  string histNameStr = "hist";
   histNameStr += name;
   const char * histNameChar = histNameStr.c_str();
 
   Int_t index = getIndex(name);
 
-  TH1F *hist = new TH1F(histNameChar, histNameChar, nbinsx, xlow, xup);
+  TH1F *hist = new TH1F(histNameChar, histTitelChar, nbinsx, xlow, xup);
+  hist->GetXaxis()->SetTitle(name);
 
   if (cutoff) {
     unsigned int np = _cutoffList.size();
@@ -527,13 +590,17 @@ Int_t RooMinuitMCMC::changeCutoff(Int_t newCutoff)
   return 1;
 }
 
-TH2D* RooMinuitMCMC::getCornerPlot(const char* name1, const char* name2, Int_t nbinsx, Double_t xlow, Double_t xup, Int_t nbinsy, Double_t ylow, Double_t yup, Bool_t cutoff)
+TH2D* RooMinuitMCMC::getCornerPlot(const char* name1, const char* name2, Int_t nbinsx, Int_t nbinsy, Bool_t cutoff)
 {
-  string histNameStr = "Corner Plot of ";
+  string histNameStr = "cornerhist";
   histNameStr += name1;
-  histNameStr += " and ";
   histNameStr += name2;
   const char * histNameChar = histNameStr.c_str();
+  string histTitelStr = "Corner Plot of ";
+  histTitelStr += name1;
+  histTitelStr += " and ";
+  histTitelStr += name2;
+  const char * histTitelChar = histTitelStr.c_str();
   if (_pointList.size() == 0) {
     std::cout << "point list empty. Please run mcmc() first" << std::endl;
   }
@@ -551,7 +618,14 @@ TH2D* RooMinuitMCMC::getCornerPlot(const char* name1, const char* name2, Int_t n
     }
   }
 
-  TH2D *hist = new TH2D(histNameChar,histNameChar,nbinsx,xlow,xup,nbinsy,ylow,yup);
+  Double_t xlow = getMinList(name1);
+  Double_t xup = getMaxList(name1);
+  Double_t ylow = getMinList(name2);
+  Double_t yup = getMaxList(name2);
+
+  TH2D *hist = new TH2D(histNameChar,histTitelChar,nbinsx,xlow,xup,nbinsy,ylow,yup);
+  hist->GetXaxis()->SetTitle(name1);
+  hist->GetYaxis()->SetTitle(name2);
 
   if (cutoff) {
     unsigned int np = _cutoffList.size();
@@ -588,9 +662,11 @@ TH2D* RooMinuitMCMC::getCornerPlot(const char* name1, const char* name2, Int_t n
   }
 }
 
-void RooMinuitMCMC::sortPointList()
+
+
+void RooMinuitMCMC::sortPointList(const char* name)
 {
-  int index = _nPar;
+  int index = getIndex(name);
   _sortPointList.clear();
   _sortPointList.reserve(_cutoffList.size());
   for (size_t i = 0; i < _cutoffList.size(); i++) {
@@ -625,7 +701,7 @@ Int_t RooMinuitMCMC::getIndex(const char* name)
 
 Int_t RooMinuitMCMC::printError(const char* name, Double_t conf)
 {
-  sortPointList();
+  sortPointList(name);
   Int_t count = int(_sortPointList.size() * conf) ;
   Double_t high = -1e32;
   Double_t low = 1e32;
@@ -641,12 +717,127 @@ Int_t RooMinuitMCMC::printError(const char* name, Double_t conf)
       high = var->getVal();
     }
   }
-  std::cout << "error = "<< high - low << std::endl;
+  std::cout << "error on "<<name<<" = "<< (high - low)/2 << std::endl;
   return 1;
 
 }
 
-Int_t RooMinuitMCMC::saveCandidates(const char* name)
+Int_t RooMinuitMCMC::getPercentile(const char* name, Double_t conf)
+{
+  Double_t per = conf;
+  if (conf > 1.0) {
+    per = 0.682;
+  }
+  Double_t left = 0;
+  Double_t right = 0;
+  Int_t index = getIndex(name);
+  sortPointList(name);
+  size_t np = _sortPointList.size();
+  size_t i = 0;
+  while (double(i)/double(np) < (1-per)/2) {
+    RooArgList* pointl = (RooArgList*) _sortPointList[i];
+    RooRealVar* varl = (RooRealVar*) pointl->at(index);
+    left = varl->getVal();
+    i++;
+  }
+
+  i=np-1;
+  size_t n = 0;
+  while (double(n)/double(np) < (1-per)/2) {
+    RooArgList* pointr = (RooArgList*) _sortPointList[i];
+    RooRealVar* varr = (RooRealVar*) pointr->at(index);
+    right = varr->getVal();
+    i--;
+    n++;
+  }
+  RooRealVar* bestvar = (RooRealVar*) _bestParamList->at(index);
+  std::cout << "ASYMETRIC ERROR at "<<per<<" confidence level for "<< name << std::endl;
+  std::cout << "INTERVAL =\t[ "<< left <<" , "<< right <<" ]"<< std::endl;
+  std::cout << "BEST     =\t"<< bestvar->getVal() << std::endl;
+  std::cout << "MINUS    =\t"<< bestvar->getVal() - left << std::endl;
+  std::cout << "PLUS     =\t"<< right - bestvar->getVal() << std::endl;
+  std::cout << "" << std::endl;
+
+
+  return 1;
+}
+
+Int_t RooMinuitMCMC::getGausErrors()
+{
+  int nPar = _nPar;
+  std::vector<const char*> names;
+  names.reserve(nPar);
+  for (int i = 0; i < nPar; i++) {
+    RooArgList* point = (RooArgList*) _cutoffList[0];
+    RooRealVar* var = (RooRealVar*) point->at(i);
+    names[i] = var->GetName();
+  }
+
+  std::vector<TH1F*> hist1D;
+  hist1D.reserve(nPar);
+  for (int i = 0; i < nPar;i++) {
+    TH1F* hist = getWalkDisHis(names[i],100,kTRUE);
+    hist1D[i] = hist;
+  }
+
+  std::vector<TH2D*> hist2D;
+  hist2D.reserve(nPar*(nPar-1)/2);
+  for (int i = 0; i < (nPar*(nPar-1)/2); i++) {
+    TH2D* hist = getCornerPlot(names[i],names[i+1],100,100,kTRUE);
+    hist2D[i] = hist;
+  }
+
+  std::cout <<"NO."<<"\t"<<"NAME"<<"\t"<<"VALUE"<<"\t"<<"ERROR"<< std::endl;
+  for (int i = 0; i < nPar; i++) {
+    std::cout <<i+1<<"\t"<<names[i]<<"\t"<<hist1D[i]->GetMean()<<"\t"<<hist1D[i]->GetRMS()<< std::endl;
+  }
+  std::cout << "" << std::endl;
+  Double_t corr[nPar][nPar];
+  for (int i = 0; i < nPar; i++) {
+    for (int j = i; j < nPar; j++) {
+      if (i == j) {
+        corr[i][j] = 1.0;
+      }else{
+        corr[i][j] = hist2D[i]->GetCorrelationFactor();
+      }
+    }
+  }
+  for (int i = 0; i < nPar; i++) {
+    for (int j = i; j < nPar; j++) {
+      if (i == j) {
+        corr[i][j] = 1.0;
+      }else{
+        corr[j][i] = corr[i][j];
+      }
+    }
+  }
+
+  std::cout << "CORRELATION COEFFICIENTS" << std::endl;
+  std::cout << "NO."<<"\t";
+  for (int i = 0; i < nPar; i++) {
+    std::cout << i<< "\t\t";
+  }
+  std::cout << "" << std::endl;
+
+  for (int i = 0; i < nPar; i++) {
+    std::cout << i<<"\t";
+    for (int j = 0; j < nPar; j++) {
+      std::cout << corr[i][j] <<"\t\t";
+    }
+    std::cout << "" << std::endl;
+  }
+  std::cout << "" << std::endl;
+
+  for (size_t i = 0; i < hist1D.size(); i++) {
+    delete hist1D[i];
+  }
+  for (size_t i = 0; i < hist2D.size(); i++) {
+    delete hist2D[i];
+  }
+  return 1;
+}
+
+Int_t RooMinuitMCMC::saveCandidatesAs(const char* name)
 {
   ofstream candidates;
   candidates.open(name);
@@ -669,6 +860,128 @@ Int_t RooMinuitMCMC::saveCandidates(const char* name)
   return 1;
 }
 
+Int_t RooMinuitMCMC::saveCornerPlot()
+{
+  TCanvas* corner = new TCanvas("corner","corner plot",1,1,1920,1080);
+  gStyle->SetOptStat(0);
+  int nPar = _nPar;
+  int nPads = nPar+ nPar*nPar;
+  std::vector<TPad*> pads;
+  pads.reserve(nPads);
+  for (int i = 0; i < nPar; i++) {
+    corner->cd();
+    std::string s = std::to_string(i);
+    const char* padname = s.c_str();
+    TPad *pad = new TPad(padname,padname,0.05,0.02+((nPar-i-1)* 1.0/nPar),0.95,0.97-(i* 1.0/nPar));
+    pads[i] = pad;
+    pads[i]->SetFillColor(0);
+    pads[i]->Draw();
+  }
+  for (int i = 0; i < nPar; i++) {
+    int subpadindex = 0;
+    for (int j = (i+1)*nPar; j < (i+2)*nPar; j++) {
+      std::string s = std::to_string(i);
+      s = std::to_string(j);
+      const char* padname = s.c_str();
+      TPad *subpad = new TPad(padname,padname,0.02+(subpadindex* 1.0/nPar),0.05,((subpadindex+1)* 1.0/nPar)-nPar*0.01,0.95,17,3);
+      pads[i]->cd();
+      pads[j] = subpad;
+      pads[j]->SetFillColor(0);
+      pads[j]->Draw();
+      subpadindex++;
+    }
+  }
+
+  std::vector<const char*> names;
+  names.reserve(nPar);
+  for (int i = 0; i < nPar; i++) {
+    RooArgList* point = (RooArgList*) _cutoffList[0];
+    RooRealVar* var = (RooRealVar*) point->at(i);
+    names[i] = var->GetName();
+  }
+
+  std::vector<TH1F*> hist1D;
+  hist1D.reserve(nPar);
+  for (int i = 0; i < nPar;i++) {
+    TH1F* hist = getWalkDisHis(names[i],100,kTRUE);
+    hist1D[i] = hist;
+  }
+
+  std::vector<TH2D*> hist2D;
+  hist2D.reserve(nPar*(nPar-1)/2);
+  for (int i = 0; i < (nPar*(nPar-1)/2); i++) {
+    TH2D* hist = getCornerPlot(names[i],names[i+1],100,100,kTRUE);
+    hist2D[i] = hist;
+  }
+
+
+  size_t Plot1DIndex = 0;
+  for (int i = nPar; i < nPads;) {
+    pads[i]->cd();
+    hist1D[Plot1DIndex]->Draw();
+    Plot1DIndex++;
+    i+=nPar+1;
+  }
+
+  size_t Plot2DIndex = 0;
+  for (int i = 2; i < nPar+1; i++) {
+    int padindex = i*nPar;
+    for (int j = 1; j < i; j++) {
+      pads[padindex]->cd();
+      hist2D[Plot2DIndex]->SetMarkerStyle(7);
+      hist2D[Plot2DIndex]->Draw();
+      padindex++;
+      Plot2DIndex++;
+    }
+  }
+
+  TFile* file = new TFile(_fileName, "recreate");
+  for (size_t i = 0; i < hist1D.size(); i++) {
+    hist1D[i]->Write();
+  }
+  for (size_t i = 0; i < hist2D.size(); i++) {
+    hist2D[i]->Write();
+  }
+  file->Close();
+  corner->SaveAs("cornerPlot.png");
+
+  for (size_t i = 0; i < hist1D.size(); i++) {
+    delete hist1D[i];
+  }
+  for (size_t i = 0; i < hist2D.size(); i++) {
+    delete hist2D[i];
+  }
+
+  return 1;
+}
+
+Double_t RooMinuitMCMC::getMinList(const char* name)
+{
+  size_t index = getIndex(name);
+  Double_t minval = 1e32;
+  for (size_t i = 0; i < _cutoffList.size(); i++) {
+    RooArgList* point = (RooArgList*) _cutoffList[i];
+    RooRealVar* var = (RooRealVar*) point->at(index);
+    if (var->getVal() < minval) {
+      minval = var->getVal();
+    }
+  }
+  return minval;
+}
+
+Double_t RooMinuitMCMC::getMaxList(const char* name)
+{
+  size_t index = getIndex(name);
+  Double_t maxval = -1e32;
+  for (size_t i = 0; i < _cutoffList.size(); i++) {
+    RooArgList* point = (RooArgList*) _cutoffList[i];
+    RooRealVar* var = (RooRealVar*) point->at(index);
+    if (var->getVal() > maxval) {
+      maxval = var->getVal();
+    }
+  }
+  return maxval;
+}
 ////////////////////////////////////////////////////////////////////////////////
 /// Change MINUIT strategy to istrat. Accepted codes
 /// are 0,1,2 and represent MINUIT strategies for dealing

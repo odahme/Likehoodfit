@@ -23,9 +23,10 @@
 #include <vector>
 //#include <string>
 //#include <map>
+#include "TFile.h"
 
 class RooAbsReal ;
-//class RooFitResult ;
+class RooFitResult ;
 class RooArgList ;
 //class RooRealVar ;
 //class RooArgSet ;
@@ -33,6 +34,9 @@ class RooAbsArg ;
 class TVirtualFitter ;
 class TH2F ;
 class RooPlot ;
+class TCanvas;
+class TFile;
+class TMultiGraph;
 
 //void RooMinuitMCMCGlue(Int_t& /*np*/, Double_t* /*gin*/,  Double_t &f, Double_t *par, Int_t /*flag*/) ;
 
@@ -53,14 +57,18 @@ public:
 
 //  RooFitResult* fit(const char* options) ;
 
-  Int_t mcmc(Int_t npoints, Int_t cutoff);
-  TGraph getProfile(const char* name, Bool_t cutoff = kTRUE);
-  TGraph getWalkDis(const char* name, Bool_t cutoff = kTRUE);
-  TH1F*   getWalkDisHis(const char* name,  Int_t nbinsx, Double_t xlow, Double_t xup, Bool_t cutoff);
-  TH2D*   getCornerPlot(const char* name1, const char* name2, Int_t nbinsx, Double_t xlow, Double_t xup,  Int_t nbinsy, Double_t ylow, Double_t yup, Bool_t cutoff);
+  Int_t mcmc(Int_t npoints, Int_t cutoff, const char* errorstrategy = "gaus");
+  TGraph* getProfile(const char* name, Bool_t cutoff = kTRUE);
+  TMultiGraph* getWalkDis(const char* name, Bool_t cutoff = kTRUE);
+  TH1F*   getWalkDisHis(const char* name,  Int_t nbinsx, Bool_t cutoff = kTRUE);
+  TH2D*   getCornerPlot(const char* name1, const char* name2, Int_t nbinsx, Int_t nbinsy, Bool_t cutoff = kTRUE);
   Int_t changeCutoff(Int_t newCutoff);
-  Int_t printError(const char* name, Double_t conf);
-  Int_t saveCandidates(const char* name);
+  Int_t printError(const char* name, Double_t conf = 0.682);
+  Int_t saveCandidatesAs(const char* name);
+  Int_t saveCornerPlot();
+  Int_t getPercentile(const char* name, Double_t conf = 0.682);
+  Int_t getGausErrors();
+  // RooFitResult* getFit(const char* userName, const char* userTitle);
   // Int_t migrad() ;
   // Int_t hesse() ;
 //  Int_t minos() ;
@@ -116,8 +124,14 @@ public:
 //   void saveStatus(const char* label, Int_t status) { _statusHistory.push_back(std::pair<std::string,int>(label,status)) ; }
 //
      void updateFloatVec() ;
-     void sortPointList() ;
+     void sortPointList(const char* name1) ;
      Int_t getIndex(const char* name) ;
+     Double_t getMinList(const char* name);
+     Double_t getMaxList(const char* name);
+     void setFileName(const TString name)
+     {
+       _fileName = name;
+     };
 //
  private:
 //
@@ -144,10 +158,13 @@ public:
    std::vector<RooArgList*> _pointList;
    std::vector<RooArgList*> _cutoffList;
    std::vector<RooArgList*> _sortPointList;
+   TString _fileName;
 //
 //   Double_t    _maxFCN ;
 //   std::ofstream*   _logfile ;
    Bool_t      _verbose ;
+   Bool_t     _gaus = kFALSE;
+   Bool_t     _interval = kFALSE;
 //   TStopwatch  _timer ;
 //   TStopwatch  _cumulTimer ;
 //

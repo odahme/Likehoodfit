@@ -10,7 +10,7 @@ RPATH = /home/oliver/ROOT/root/
 #RLIB=   -L$(RPATH)lib -lCore -lHist -lGraf -lGraf3d -lGpad -lRooFit -lRooFitCore -lTree  \
 
 RLIB=   -L$(RPATH)lib -lCore -lHist -lGraf -lGraf3d -lGpad -lTree -lMathCore -lRooFitCore -lRooFit \
-        -lRint -lPostscript -lMatrix -lPhysics -lMinuit -lm -ldl -lpthread -rdynamic -Wl,--no-as-needed $(ROOTGLIBS)
+        -lRint -lRIO -lPostscript -lMatrix -lPhysics -lMinuit -lm -ldl -lpthread -rdynamic -Wl,--no-as-needed $(ROOTGLIBS)
 
 #	-lRint -lPostscript -lMatrix -lPhysics -lm -ldl -lpthread -rdynamic
 # 2) Niejawnie, przy uzyciu root-config

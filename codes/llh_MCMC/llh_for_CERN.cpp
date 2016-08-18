@@ -52,9 +52,9 @@ int main(int argc, char **argv) {
 TApplication theApp("demoApplication",&argc,argv);
 //create a canvas
 
-TCanvas c1("c1","c1",1,1,1920,1080);
-// TCanvas c2("c2","c2",1,1,1920,1080);
-// TCanvas c3("c3","c3",1,1,1920,1080);
+  TCanvas c1("c1","c1",1,1,1920,1080);
+ //TCanvas c2("c2","c2",1,1,1920,1080);
+ // TCanvas c3("c3","c3",1,1,1920,1080);
 
 TRandom3 *rnd = new TRandom3(35);
 
@@ -92,17 +92,37 @@ RooDataSet data("data", "data",RooArgSet(x));
   RooAbsReal* nll = gauss.createNLL(data) ;
 
 // Create MINUIT interface object
-  RooMinuitMCMC m(*nll) ;
+  RooMinuitMCMC mgaus(*nll) ;
+  RooMinuitMCMC mintervla(*nll);
+  //
+  // RooMinuit mi(*nll);
+  // mi.minos();
 
-  RooMinuit mi(*nll);
-  mi.minos();
-  mi.hesse();
+  mgaus.mcmc(1000,100,"gaus");
+  mintervla.mcmc(1000,100,"interval");
+//  m.saveCandidatesAs("candidates.txt");
 
-m.mcmc(1000,200);
-m.saveCandidates("candidates.txt");
+  // RooPlot* mcmcframe = x.frame();
+  // data.plotOn(mcmcframe);
+  // gauss.plotOn(mcmcframe);
+  // c1.cd();
+  // mcmcframe->Draw();
+  // c1.SaveAs("MCMC_fit.png");
 
 
-
+  // TMultiGraph* walkDis = m.getWalkDis("mean",kFALSE);
+  // c2.cd();
+  // walkDis->Draw("a");
+  // c2.SaveAs("sigmaWalkDis.png");
+  //
+  //
+  // TGraph* muprofile = m.getProfile("mean");
+  // c1.cd();
+  // muprofile->Draw();
+  // c1.SaveAs("muprofile.png");
+  // m.printError("mean",0.682);
+  // m.getPercentile("mean");
+  // m.saveCornerPlot();
 
 //data.Print("v");
 //cout << endl ;
@@ -115,30 +135,8 @@ m.saveCandidates("candidates.txt");
 //nll->plotOn(xframe);
 //xframe->SetAxisRange(-10,10);
 
-//root fit stuff end
-// TGraph muprofile = m.getProfile("mean",kTRUE);
-// c1.cd();
-// muprofile.SetTitle("MCMC");
-// muprofile.GetXaxis()->SetTitle("mean value");
-// muprofile.GetYaxis()->SetTitle("nll value");
-// muprofile.Draw();
-// c1.SaveAs("muprofile.png");
 
-// TGraph walkDis = m.getWalkDis("mean",kTRUE);
-// c2.cd();
-// walkDis.SetTitle("walk distribution of mean with cutoff");
-// walkDis.GetXaxis()->SetTitle("number of steps");
-// walkDis.GetYaxis()->SetTitle("mean value");
-// walkDis.Draw();
-// c2.SaveAs("mustepprofile.png");
 
-// TGraph walkDis = m.getWalkDis("sigma",kTRUE);
-// c2.cd();
-// walkDis.SetTitle("walk distribution of sigma with cutoff");
-// walkDis.GetXaxis()->SetTitle("number of steps");
-// walkDis.GetYaxis()->SetTitle("sigma value");
-// walkDis.Draw();
-// c2.SaveAs("sigmaWalkDis.png");
 
 // TH2D corner = m.getCornerPlot("mean","sigma",100, 2.8, 3.2, 100, 1.43, 1.65,kTRUE);
 // corner.SetTitle("Corner Plot");
@@ -147,46 +145,6 @@ m.saveCandidates("candidates.txt");
 // c3.cd();
 // corner.Draw("A*");
 // c3.SaveAs("cornerplot.png");
-
-
-//creating nice corner plot
-
-  TH1F *WalkDisHisMu = m.getWalkDisHis("mean", 100, 2.8, 3.2,kTRUE);
-  TH1F *WalkDisHisSig = m.getWalkDisHis("sigma", 100, 1.43, 1.65,kTRUE);
-  TH2D *corner = m.getCornerPlot("mean","sigma",100, 2.8, 3.2, 100, 1.43, 1.65,kTRUE);
-  gStyle->SetOptStat(0);
-  c1.cd();
-
-  TPad *pad1 = new TPad("pad1","This is pad1",0.05,0.52,0.95,0.97);
-  TPad *pad2 = new TPad("pad2","This is pad2",0.05,0.02,0.95,0.47);
-  pad1->SetFillColor(0);
-  pad2->SetFillColor(0);
-  pad1->Draw();
-  pad2->Draw();
-
-  pad1->cd();
-  TPad *pad11 = new TPad("pad11","First subpad of pad1",0.02,0.05,0.48,0.95,17,3);
-  TPad *pad12 = new TPad("pad12","Second subpad of pad1",0.52,0.05,0.98,0.95,17,3);
-  pad11->SetFillColor(0);
-  pad12->SetFillColor(0);
-  pad11->Draw();
-  pad12->Draw();
-
-  pad2->cd();
-  TPad *pad21 = new TPad("pad21","First subpad of pad2",0.02,0.05,0.48,0.95,17,3);
-  TPad *pad22 = new TPad("pad22","Second subpad of pad2",0.52,0.05,0.98,0.95,17,3);
-  pad21->SetFillColor(0);
-  pad22->SetFillColor(0);
-  pad21->Draw();
-  pad22->Draw();
-
-  pad11->cd();
-  WalkDisHisMu->Draw();
-  pad21->cd();
-  corner->SetMarkerStyle(7);
-  corner->Draw();
-  pad22->cd();
-  WalkDisHisSig->Draw();
 
 
 //m.printError("mean",0.68);

@@ -21,7 +21,7 @@ DIRNAME = ./
 #======================================================================
 # Nazwa rdzeniowa modulu programu
 NAME1 = RooMinuitMCMC
-NAME2 = llh_for_CERN
+NAME2 = twogaus
 #NAME2 = generatory
 # Pliki objectowe (po kompilacji)
 OBJT1 = $(NAME1).o

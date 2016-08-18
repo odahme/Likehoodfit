@@ -92,14 +92,12 @@ RooDataSet data("data", "data",RooArgSet(x));
   RooAbsReal* nll = gauss.createNLL(data) ;
 
 // Create MINUIT interface object
-  RooMinuitMCMC mgaus(*nll) ;
-  RooMinuitMCMC mintervla(*nll);
+  RooMinuitMCMC m(*nll) ;
   //
   // RooMinuit mi(*nll);
   // mi.minos();
 
-  mgaus.mcmc(1000,100,"gaus");
-  mintervla.mcmc(1000,100,"interval");
+  m.mcmc(1000,100,"gaus");
 //  m.saveCandidatesAs("candidates.txt");
 
   // RooPlot* mcmcframe = x.frame();
@@ -122,7 +120,7 @@ RooDataSet data("data", "data",RooArgSet(x));
   // c1.SaveAs("muprofile.png");
   // m.printError("mean",0.682);
   // m.getPercentile("mean");
-  // m.saveCornerPlot();
+  m.saveCornerPlot();
 
 //data.Print("v");
 //cout << endl ;

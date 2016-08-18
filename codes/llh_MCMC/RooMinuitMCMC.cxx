@@ -227,7 +227,7 @@ RooMinuitMCMC::~RooMinuitMCMC()
 }
 
 
-Int_t RooMinuitMCMC::mcmc(Int_t npoints, Int_t cutoff, const char* errorstrategy)
+Int_t RooMinuitMCMC::mcmc(Int_t npoints, size_t cutoff, const char* errorstrategy)
 {
 
   if (strcmp(errorstrategy, "gaus") == 0) {
@@ -299,9 +299,9 @@ Int_t RooMinuitMCMC::mcmc(Int_t npoints, Int_t cutoff, const char* errorstrategy
     for(Int_t index= 0; index < nPar; index++) {
       context->setPdfParamVal(index, par[index],verbose);
     }
-    RooAbsReal::setHideOffset(kFALSE) ;
+    // RooAbsReal::setHideOffset(kFALSE) ;
     double llh_last = context->_func->getVal(); //get nll for last parameters
-    RooAbsReal::setHideOffset(kFALSE) ;
+    // RooAbsReal::setHideOffset(kFALSE) ;
 
     for (int j = 0; j < nPar; j++) {
       RooRealVar* var = (RooRealVar*) curr->at(j);
@@ -313,14 +313,14 @@ Int_t RooMinuitMCMC::mcmc(Int_t npoints, Int_t cutoff, const char* errorstrategy
     for(Int_t index= 0; index < nPar; index++) {
       context->setPdfParamVal(index, par[index],verbose);
     }
-    RooAbsReal::setHideOffset(kFALSE) ;
+    // RooAbsReal::setHideOffset(kFALSE) ;
     double llh_curr = context->_func->getVal(); //get nll for current parameters
-    RooAbsReal::setHideOffset(kFALSE) ;
+    // RooAbsReal::setHideOffset(kFALSE) ;
 
 
 
 
-    if (llh_curr < minllh) {
+    if (llh_curr < minllh && i > cutoff) {
       best = (RooArgList*) curr->snapshot(kTRUE);
     }
 
@@ -777,28 +777,33 @@ Int_t RooMinuitMCMC::getGausErrors()
   hist1D.reserve(nPar);
   for (int i = 0; i < nPar;i++) {
     TH1F* hist = getWalkDisHis(names[i],100,kTRUE);
-    hist1D[i] = hist;
+    hist1D.push_back(hist);
   }
 
   std::vector<TH2D*> hist2D;
   hist2D.reserve(nPar*(nPar-1)/2);
-  for (int i = 0; i < (nPar*(nPar-1)/2); i++) {
-    TH2D* hist = getCornerPlot(names[i],names[i+1],100,100,kTRUE);
-    hist2D[i] = hist;
+  for (int i = 0; i < nPar; i++) {
+    for (int j = i+1; j < nPar; j++) {
+      TH2D* hist = getCornerPlot(names[i],names[j],100,100,kTRUE);
+      hist2D.push_back(hist);
+    }
   }
 
-  std::cout <<"NO."<<"\t"<<"NAME"<<"\t"<<"VALUE"<<"\t"<<"ERROR"<< std::endl;
+  cout.precision(5);
+  std::cout <<"NO."<<"\t"<<"NAME"<<"\t"<<"VALUE"<<"\t\t"<<"ERROR"<< std::endl;
   for (int i = 0; i < nPar; i++) {
-    std::cout <<i+1<<"\t"<<names[i]<<"\t"<<hist1D[i]->GetMean()<<"\t"<<hist1D[i]->GetRMS()<< std::endl;
+    std::cout <<i+1<<std::scientific<<"\t"<<names[i]<<"\t"<<hist1D[i]->GetMean()<<"\t"<<hist1D[i]->GetRMS()<< std::endl;
   }
   std::cout << "" << std::endl;
   Double_t corr[nPar][nPar];
+  int n = 0;
   for (int i = 0; i < nPar; i++) {
-    for (int j = i; j < nPar; j++) {
+    for (int j = i+1; j < nPar; j++) {
       if (i == j) {
         corr[i][j] = 1.0;
       }else{
-        corr[i][j] = hist2D[i]->GetCorrelationFactor();
+        corr[i][j] = hist2D[n]->GetCorrelationFactor();
+        n++;
       }
     }
   }
@@ -811,18 +816,18 @@ Int_t RooMinuitMCMC::getGausErrors()
       }
     }
   }
-
-  std::cout << "CORRELATION COEFFICIENTS" << std::endl;
+  cout.precision(3);
+  std::cout <<std::fixed<< "CORRELATION COEFFICIENTS" << std::endl;
   std::cout << "NO."<<"\t";
   for (int i = 0; i < nPar; i++) {
-    std::cout << i<< "\t\t";
+    std::cout << i+1<< "\t";
   }
   std::cout << "" << std::endl;
 
   for (int i = 0; i < nPar; i++) {
-    std::cout << i<<"\t";
+    std::cout << i+1<<"\t";
     for (int j = 0; j < nPar; j++) {
-      std::cout << corr[i][j] <<"\t\t";
+      std::cout << corr[i][j] <<"\t";
     }
     std::cout << "" << std::endl;
   }
@@ -834,6 +839,11 @@ Int_t RooMinuitMCMC::getGausErrors()
   for (size_t i = 0; i < hist2D.size(); i++) {
     delete hist2D[i];
   }
+
+
+  hist1D.clear();
+  hist2D.clear();
+
   return 1;
 }
 
@@ -860,12 +870,13 @@ Int_t RooMinuitMCMC::saveCandidatesAs(const char* name)
   return 1;
 }
 
-Int_t RooMinuitMCMC::saveCornerPlot()
+Int_t RooMinuitMCMC::saveCornerPlotAs(const char* pngname)
 {
-  TCanvas* corner = new TCanvas("corner","corner plot",1,1,1920,1080);
+
   gStyle->SetOptStat(0);
   int nPar = _nPar;
   int nPads = nPar+ nPar*nPar;
+  TCanvas* corner = new TCanvas("corner","corner plot",1,1,nPar*800,nPar*600);
   std::vector<TPad*> pads;
   pads.reserve(nPads);
   for (int i = 0; i < nPar; i++) {
@@ -873,7 +884,7 @@ Int_t RooMinuitMCMC::saveCornerPlot()
     std::string s = std::to_string(i);
     const char* padname = s.c_str();
     TPad *pad = new TPad(padname,padname,0.05,0.02+((nPar-i-1)* 1.0/nPar),0.95,0.97-(i* 1.0/nPar));
-    pads[i] = pad;
+    pads.push_back(pad);
     pads[i]->SetFillColor(0);
     pads[i]->Draw();
   }
@@ -885,7 +896,7 @@ Int_t RooMinuitMCMC::saveCornerPlot()
       const char* padname = s.c_str();
       TPad *subpad = new TPad(padname,padname,0.02+(subpadindex* 1.0/nPar),0.05,((subpadindex+1)* 1.0/nPar)-nPar*0.01,0.95,17,3);
       pads[i]->cd();
-      pads[j] = subpad;
+      pads.push_back(subpad);
       pads[j]->SetFillColor(0);
       pads[j]->Draw();
       subpadindex++;
@@ -904,14 +915,16 @@ Int_t RooMinuitMCMC::saveCornerPlot()
   hist1D.reserve(nPar);
   for (int i = 0; i < nPar;i++) {
     TH1F* hist = getWalkDisHis(names[i],100,kTRUE);
-    hist1D[i] = hist;
+    hist1D.push_back(hist);
   }
 
   std::vector<TH2D*> hist2D;
   hist2D.reserve(nPar*(nPar-1)/2);
-  for (int i = 0; i < (nPar*(nPar-1)/2); i++) {
-    TH2D* hist = getCornerPlot(names[i],names[i+1],100,100,kTRUE);
-    hist2D[i] = hist;
+  for (int i = 0; i < nPar; i++) {
+    for (int j = i+1; j < nPar; j++) {
+      TH2D* hist = getCornerPlot(names[i],names[j],100,100,kTRUE);
+      hist2D.push_back(hist);
+    }
   }
 
 
@@ -929,28 +942,30 @@ Int_t RooMinuitMCMC::saveCornerPlot()
     for (int j = 1; j < i; j++) {
       pads[padindex]->cd();
       hist2D[Plot2DIndex]->SetMarkerStyle(7);
-      hist2D[Plot2DIndex]->Draw();
+      hist2D[Plot2DIndex]->Draw("colz");
       padindex++;
       Plot2DIndex++;
     }
   }
 
+  corner->SaveAs(pngname);
+
   TFile* file = new TFile(_fileName, "recreate");
+  file->cd();
   for (size_t i = 0; i < hist1D.size(); i++) {
     hist1D[i]->Write();
-  }
-  for (size_t i = 0; i < hist2D.size(); i++) {
-    hist2D[i]->Write();
-  }
-  file->Close();
-  corner->SaveAs("cornerPlot.png");
-
-  for (size_t i = 0; i < hist1D.size(); i++) {
     delete hist1D[i];
   }
   for (size_t i = 0; i < hist2D.size(); i++) {
+    hist2D[i]->Write();
     delete hist2D[i];
   }
+  file->Close();
+
+
+
+  hist1D.clear();
+  hist2D.clear();
 
   return 1;
 }

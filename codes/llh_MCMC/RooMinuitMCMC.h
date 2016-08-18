@@ -32,7 +32,8 @@ class RooArgList ;
 //class RooArgSet ;
 class RooAbsArg ;
 class TVirtualFitter ;
-class TH2F ;
+class TH2D ;
+class Th1F ;
 class RooPlot ;
 class TCanvas;
 class TFile;
@@ -57,7 +58,7 @@ public:
 
 //  RooFitResult* fit(const char* options) ;
 
-  Int_t mcmc(Int_t npoints, Int_t cutoff, const char* errorstrategy = "gaus");
+  Int_t mcmc(Int_t npoints, size_t cutoff, const char* errorstrategy = "gaus");
   TGraph* getProfile(const char* name, Bool_t cutoff = kTRUE);
   TMultiGraph* getWalkDis(const char* name, Bool_t cutoff = kTRUE);
   TH1F*   getWalkDisHis(const char* name,  Int_t nbinsx, Bool_t cutoff = kTRUE);
@@ -65,7 +66,7 @@ public:
   Int_t changeCutoff(Int_t newCutoff);
   Int_t printError(const char* name, Double_t conf = 0.682);
   Int_t saveCandidatesAs(const char* name);
-  Int_t saveCornerPlot();
+  Int_t saveCornerPlotAs(const char* pngname);
   Int_t getPercentile(const char* name, Double_t conf = 0.682);
   Int_t getGausErrors();
   // RooFitResult* getFit(const char* userName, const char* userTitle);

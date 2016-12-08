@@ -34,7 +34,7 @@ CXX = g++
 # 1) Jawnie
 #CXXFLAGS = -O -Wall -pthread -I$(RPATH)include
 # 2) Przy uzyciu root-config
-CXXFLAGS = -O -Wall `root-config --cflags`
+CXXFLAGS = -O2 -Wall `root-config --cflags`
 # Nazwa i opcje linkera
 LD = $(CXX)
 LDFLAGS = `root-config --ldflags`

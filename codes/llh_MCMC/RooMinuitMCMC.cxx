@@ -39,7 +39,7 @@
 // END_HTML
 //
 
- #include "RooFit.h"
+#include "RooFit.h"
 // #include "Riostream.h"
 //
  // #include "TClass.h"
@@ -870,7 +870,7 @@ Int_t RooMinuitMCMC::saveCandidatesAs(const char* name)
   return 1;
 }
 
-Int_t RooMinuitMCMC::saveCornerPlotAs(const char* pngname)
+Int_t RooMinuitMCMC::saveCornerPlotAs(const char* picname)
 {
 
   gStyle->SetOptStat(0);
@@ -948,7 +948,7 @@ Int_t RooMinuitMCMC::saveCornerPlotAs(const char* pngname)
     }
   }
 
-  corner->SaveAs(pngname);
+  corner->SaveAs(picname);
 
   TFile* file = new TFile(_fileName, "recreate");
   file->cd();

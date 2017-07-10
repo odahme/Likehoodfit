@@ -50,17 +50,19 @@ for (unsigned int j = 0; j < gauss_points.GetNrows(); j++) {
 }
 
 
-unsigned int count = 50000;
-double llh_p[count];
-double mu_p[count];
+unsigned int count = 10000;
+double mu_start = 2.9;
+double mu_end = 3.1;
+TVectorD llh_p(count);
+TVectorD mu_p(count);
 
 double sigma = 1.5;
-double mu = 3;
+double mu = mu_start;
 
 double llhmin = 1e32;
 double calc = 0;
-for (unsigned int i = 1; i < count+1; i++) {
-  mu = i/10000.0;
+double x = abs(mu_end - mu_start)/count;
+for (unsigned int i = 0; i < count; i++) {
   calc = f_gllh(mu,sigma,gauss_points);
   mu_p[i] = mu;
   // std::cout << "mu = "<< mu << std::endl;
@@ -68,30 +70,40 @@ for (unsigned int i = 1; i < count+1; i++) {
   if (calc < llhmin) {
     llhmin = calc;
   }
+  mu += x;
 }
+for (size_t i = 0; i < count; i++) {
+  llh_p[i] -= llhmin;
+  //std::cout << "mu"<<i<<" = "<< mu_p[i] << std::endl;
+}
+
 
 mu = 3;
 unsigned int sigma_count = 300;
 double sigma_p[sigma_count];
 double llh_p2[sigma_count];
 
+std::cout << "OBEN" << std::endl;
+// for (unsigned int i = 20; i < sigma_count+20; i++) {
+//   std::cout << "i = "<<i << std::endl;
+//   sigma = i/100.0;
+//   calc = f_gllh(mu,sigma,gauss_points);
+//   sigma_p[i] = sigma;
+//   // std::cout << "sigma = "<< sigma << std::endl;
+//   // std::cout << "llhs = "<< calc << std::endl;
+//   llh_p2[i] = calc;
+// }
 
-for (unsigned int i = 20; i < sigma_count+20; i++) {
-  sigma = i/100.0;
-  calc = f_gllh(mu,sigma,gauss_points);
-  sigma_p[i] = sigma;
-  // std::cout << "sigma = "<< sigma << std::endl;
-  // std::cout << "llhs = "<< calc << std::endl;
-  llh_p2[i] = calc;
-}
-
-
+std::cout << "UNTEN" << std::endl;
 
 std::cout << "llhmin = "<< llhmin << std::endl;
 
-TGraph * gr = new TGraph(count,mu_p,llh_p);
-TGraph * gr2 = new TGraph(sigma_count,sigma_p,llh_p2);
+TGraph *gr = new TGraph(mu_p,llh_p);
+TGraph *gr2 = new TGraph(sigma_count,sigma_p,llh_p2);
 c1.cd();
+gr->SetTitle("negtive Log-Likelihood");
+gr->GetXaxis()->SetTitle("parameter of intrest");
+gr->GetYaxis()->SetTitle("nll value");
 gr->Draw("A*");
 c1.SaveAs("lastmu.png");
 c2.cd();
